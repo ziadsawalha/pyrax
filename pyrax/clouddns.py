@@ -54,16 +54,19 @@ class CloudDNSClient(BaseClient):
         to handle flavors.
         """
         self._manager = BaseManager(self, resource_class=CloudDNSDomain,
-               response_key="domain", uri_base="domains")
+               response_key="domains", plural_response_key="domains",
+               uri_base="domains")
 
 
     def _create_body(self, name, emailAddress, ttl=3600, comment=None):
         """
         """
-        body = {"domain": {
+        body = {"domains": [{
                 "name": name,
                 "emailAddress": emailAddress,
                 "ttl": ttl,
                 "comment": comment,
-                }}
+                }]}
+        print "BODY"
+        print body
         return body
