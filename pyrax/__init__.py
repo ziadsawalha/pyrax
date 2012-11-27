@@ -59,6 +59,7 @@ try:
     from cloud_databases import CloudDatabaseUser
     from cloudloadbalancers import CloudLoadBalancerClient
     from cloudblockstorage import CloudBlockStorageClient
+    from clouddns import CloudDNSClient
 except ImportError:
     # See if this is the result of the importing of version.py in setup.py
     callstack = inspect.stack()
@@ -76,6 +77,7 @@ cloudfiles = None
 cloud_loadbalancers = None
 cloud_databases = None
 cloud_blockstorage = None
+cloud_dns = None
 # Class used to handle auth/identity
 identity_class = None
 # Default identity type.
@@ -101,6 +103,7 @@ services_to_start = {
         "loadbalancers": False,
         "databases": False,
         "blockstorage": True,
+        "dns": False,
         }
 # Read in the configuration file, if any
 config_file = os.path.expanduser("~/.pyrax.cfg")
@@ -215,13 +218,14 @@ def authenticate():
 def clear_credentials():
     """De-authenticate by clearing all the names back to None."""
     global identity, cloudservers, cloudfiles, cloud_loadbalancers
-    global cloud_databases, cloud_blockstorage, default_region
+    global cloud_databases, cloud_blockstorage, cloud_dns, default_region
     identity = identity_class()
     cloudservers = None
     cloudfiles = None
     cloud_loadbalancers = None
     cloud_databases = None
     cloud_blockstorage = None
+    cloud_dns = None
     default_region = None
 
 
@@ -240,7 +244,8 @@ def _make_agent_name(base):
 
 def connect_to_services():
     """Establishes authenticated connections to the various cloud APIs."""
-    global cloudservers, cloudfiles, cloud_loadbalancers, cloud_databases, cloud_blockstorage
+    global cloudservers, cloudfiles, cloud_loadbalancers, cloud_databases
+    global cloud_blockstorage, cloud_dns
     if services_to_start["servers"]:
         cloudservers = connect_to_cloudservers()
     if services_to_start["files"]:
@@ -251,28 +256,17 @@ def connect_to_services():
         cloud_databases = connect_to_cloud_databases()
     if services_to_start["blockstorage"]:
         cloud_blockstorage = connect_to_cloud_blockstorage()
+    if services_to_start["dns"]:
+        cloud_dns = connect_to_cloud_dns()
 
-def _fix_uri(ep, region, svc):
+def _fix_uri(ep, region):
     """
-    URIs returned by the "ALL" region need to be manipulated
+    Compute URIs returned by the "ALL" region need to be manipulated
     in order to provide the correct endpoints.
     """
     ep = ep.replace("//", "//%s." % region.lower())
-    # Change the version string for compute
-    if svc == "compute":
-        ep = ep.replace("v1.0", "v2")
-    return ep
-
-
-def _fix_uri(ep, region, svc):
-    """
-    URIs returned by the "ALL" region need to be manipulated
-    in order to provide the correct endpoints.
-    """
-    ep = ep.replace("//", "//%s." % region.lower())
-    # Change the version string for compute
-    if svc == "compute":
-        ep = ep.replace("v1.0", "v2")
+    # Change the version string
+    ep = ep.replace("v1.0", "v2")
     return ep
 
 
@@ -285,7 +279,8 @@ def _get_service_endpoint(svc, region=None):
     if not ep:
         # Try the "ALL" region, and substitute the actual region
         ep = identity.services.get(svc, {}).get("endpoints", {}).get("ALL", {}).get("public_url", "")
-        ep = _fix_uri(ep, region, svc)
+        if svc == "compute":
+            ep = _fix_uri(ep, region)
     return ep
 
 
@@ -359,3 +354,16 @@ def connect_to_cloud_blockstorage(region=None):
             tenant_id=identity.tenant_id, service_type="volume")
     cloud_blockstorage.user_agent = _make_agent_name(cloud_blockstorage.user_agent)
     return cloud_blockstorage
+
+
+@_require_auth
+def connect_to_cloud_dns(region=None):
+    """Creates a client for working with cloud dns."""
+    region = safe_region(region)
+    ep = _get_service_endpoint("dns", region)
+    cloud_dns = CloudDNSClient(identity.username, identity.api_key,
+            region_name=region, management_url=ep, auth_token=identity.token,
+#            http_log_debug=True,
+            tenant_id=identity.tenant_id, service_type="rax:dns")
+    cloud_dns.user_agent = _make_agent_name(cloud_dns.user_agent)
+    return cloud_dns
