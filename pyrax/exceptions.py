@@ -35,6 +35,9 @@ class AuthSystemNotFound(PyraxException):
 class CDNFailed(PyraxException):
     pass
 
+class DomainCreationFailed(PyraxException):
+    pass
+
 class EndpointNotFound(PyraxException):
     pass
 

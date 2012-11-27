@@ -220,7 +220,6 @@ class BaseClient(httplib2.Http):
         if "body" in kwargs:
             kwargs["headers"]["Content-Type"] = "application/json"
             kwargs["body"] = json.dumps(kwargs["body"])
-
         self.http_log_req(args, kwargs)
         resp, body = super(BaseClient, self).request(*args, **kwargs)
         self.http_log_resp(resp, body)

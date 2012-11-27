@@ -66,17 +66,11 @@ class BaseManager(object):
         self.api = api
         self.resource_class = resource_class
         self.response_key = response_key
-        print "response_key", response_key
-        print "plural_response_key", plural_response_key
-        if self.plural_response_key:
+        if plural_response_key:
             self.plural_response_key = plural_response_key
         else:
             # Default to adding 's'
-            print "ADDING S " * 22
-            print response_key
-            print
             self.plural_response_key = "%ss" % response_key
-        print "AFTER", plural_response_key
         self.uri_base = uri_base
 
 
