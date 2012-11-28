@@ -11,7 +11,6 @@ from pyrax.cloudloadbalancers import CloudLoadBalancerClient
 from pyrax.cloudloadbalancers import CloudLoadBalancer
 from pyrax.cloudloadbalancers import Node
 from pyrax.cloudloadbalancers import VirtualIP
-from pyrax.cloudloadbalancers import _get_id
 from pyrax.cloudloadbalancers import assure_parent
 from pyrax.cloudloadbalancers import assure_loadbalancer
 import pyrax.exceptions as exc
@@ -33,15 +32,6 @@ class CloudLoadBalancerTest(unittest.TestCase):
     def tearDown(self):
         self.loadbalancer = None
         self.client = None
-
-    def test_get_id(self):
-        target = "test_id"
-        class Obj_with_id(object):
-            id = target
-        obj = Obj_with_id()
-        self.assertEqual(_get_id(obj), target)
-        self.assertEqual(_get_id(obj), target)
-        self.assertEqual(_get_id(obj.id), target)
 
     def test_assure_parent_fail(self):
         orphan_node = Node(address="fake", port="fake")

@@ -211,7 +211,7 @@ def wait_until(obj, att, desired, interval=5, attempts=10, verbose=False):
     return False
 
 
-def iso_time_string(val):
+def iso_time_string(val, show_tzinfo=False):
     """
     Takes either a date, datetime or a string, and returns the standard ISO
     formatted string for that date/time, with any fractional second portion
@@ -230,7 +230,32 @@ def iso_time_string(val):
         if dt is None:
             raise exc.InvalidDateTimeString("The supplied value '%s' does not match either of the formats "
                     "'YYYY-MM-DD HH:MM:SS' or 'YYYY-MM-DD'." % val)
-    return dt.isoformat().split(".")[0]
+    else:
+        dt = val
+    if not isinstance(dt, datetime.datetime):
+        dt = datetime.datetime.fromordinal(dt.toordinal())
+    has_tz = (dt.tzinfo is not None)
+    if show_tzinfo and has_tz:
+        # Need to remove the colon in the TZ portion
+        ret = "".join(dt.isoformat().rsplit(":", 1))
+    elif show_tzinfo and not has_tz:
+        ret = "%s+0000" % dt.isoformat().split(".")[0]
+    elif not show_tzinfo and has_tz:
+        ret = dt.isoformat()[:-6]
+    elif not show_tzinfo and not has_tz:
+        ret = dt.isoformat().split(".")[0]
+    return ret
+
+
+def get_id(id_or_obj):
+    """
+    Returns the 'id' attribute of 'id_or_obj' if present; if not,
+    returns 'id_or_obj'.
+    """
+    try:
+        return id_or_obj.id
+    except AttributeError:
+        return id_or_obj
 
 
 def env(*args, **kwargs):

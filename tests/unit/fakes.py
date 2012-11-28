@@ -17,6 +17,8 @@ from pyrax.cloudloadbalancers import CloudLoadBalancerManager
 from pyrax.cloudloadbalancers import CloudLoadBalancerClient
 from pyrax.cloudloadbalancers import Node
 from pyrax.cloudloadbalancers import VirtualIP
+from pyrax.clouddns import CloudDNSClient
+from pyrax.clouddns import CloudDNSManager
 
 import pyrax.exceptions as exc
 from pyrax.rax_identity import Identity
@@ -188,6 +190,12 @@ class FakeDatabaseClient(CloudDatabaseClient):
     def __init__(self, *args, **kwargs):
         self._flavor_manager = FakeManager()
         super(FakeDatabaseClient, self).__init__("fakeuser",
+                "fakepassword", *args, **kwargs)
+
+
+class FakeDNSClient(CloudDNSClient):
+    def __init__(self, *args, **kwargs):
+        super(FakeDNSClient, self).__init__("fakeuser",
                 "fakepassword", *args, **kwargs)
 
 

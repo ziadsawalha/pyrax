@@ -30,16 +30,6 @@ import pyrax.utils as utils
 WAIT_LIMIT = 5
 
 
-def assure_instance(fnc):
-    @wraps(fnc)
-    def _wrapped(self, instance, *args, **kwargs):
-        if not isinstance(instance, CloudDatabaseInstance):
-            # Must be the ID
-            instance = self._manager.get(instance)
-        return fnc(self, instance, *args, **kwargs)
-    return _wrapped
-
-
 class CloudDNSDomain(BaseResource):
     """
     This class represents the available instance configurations, or 'flavors',
@@ -77,8 +67,6 @@ class CloudDNSManager(BaseManager):
         if return_none:
             # No response body
             return
-        if return_raw:
-            return body
         callbackURL = body["callbackUrl"].split("/status/")[-1]
         massagedURL = "/status/%s?showDetails=true" % callbackURL
         start = time.time()
@@ -154,8 +142,27 @@ class CloudDNSClient(BaseClient):
             - a Python date object
             - a string in the format 'YYYY-MM-YY HH:MM:SS'
             - a string in the format 'YYYY-MM-YY'
+
+        It returns a list of dicts, whose keys depend on the specific change
+        that was made. A simple example of such a change dict:
+
+            {u'accountId': 000000,
+             u'action': u'update',
+             u'changeDetails': [{u'field': u'serial_number',
+               u'newValue': u'1354038941',
+               u'originalValue': u'1354038940'},
+              {u'field': u'updated_at',
+               u'newValue': u'Tue Nov 27 17:55:41 UTC 2012',
+               u'originalValue': u'Tue Nov 27 17:55:40 UTC 2012'}],
+             u'domain': u'example.com',
+             u'targetId': 00000000,
+             u'targetType': u'Domain'}
         """
-        resp, body = self.method_get("/domains/%s/changes?since=%s")
+        domain_id = utils.get_id(domain)
+        dt = utils.iso_time_string(date_or_datetime, show_tzinfo=True)
+        uri = "/domains/%s/changes?since=%s" % (domain_id, dt)
+        resp, body = self.method_get(uri)
+        return body.get("changes", [])
 
 
     def get_absolute_limits(self):
