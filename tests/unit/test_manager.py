@@ -185,7 +185,7 @@ class ManagerTest(unittest.TestCase):
         sav_fa = mgr.findall
         mgr.findall = Mock(return_value=[])
         mgr.resource_class = fakes.FakeEntity
-        self.assertRaises(exc.NotFound, mgr.find)
+        self.assertEqual(mgr.find(name="fake"), [])
         mgr.findall = sav_fa
 
     def test_find_mult_match(self):

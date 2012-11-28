@@ -92,6 +92,23 @@ class CloudDNSManager(BaseManager):
         return self.resource_class(self, response_body)
 
 
+    def findall(self, **kwargs):
+        """
+        Finds all items with attributes matching ``**kwargs``.
+
+        Normally this isn't very efficient, since the default action is to
+        load the entire list and then filter on the Python side, but the DNS
+        API provides a more efficient search option when filtering on name.
+        So if the filter is on name, use that; otherwise, use the default.
+        """
+        if (len(kwargs) == 1) and ("name" in kwargs):
+            # Filtering on name; use the more efficient method.
+            uri = "/%s?name=%s" % (self.uri_base, kwargs["name"])
+            return self._list(uri)
+        else:
+            return super(CloudDNSManager, self).findall(**kwargs)
+
+
 class CloudDNSClient(BaseClient):
     """
     This is the primary class for interacting with Cloud Databases.
@@ -127,6 +144,18 @@ class CloudDNSClient(BaseClient):
                     },
                 }]}
         return body
+
+
+    def changes_since(self, domain, date_or_datetime):
+        """
+        Get the changes for a domain since the specified date/datetime.
+        The date can be one of:
+            - a Python datetime object
+            - a Python date object
+            - a string in the format 'YYYY-MM-YY HH:MM:SS'
+            - a string in the format 'YYYY-MM-YY'
+        """
+        resp, body = self.method_get("/domains/%s/changes?since=%s")
 
 
     def get_absolute_limits(self):

@@ -55,28 +55,6 @@ def _get_id(id_or_obj):
         return id_or_obj
 
 
-def _time_string(val):
-    """
-    Takes either a date, datetime or a string, and returns the standard ISO
-    formatted string for that date/time, with any fractional second portion
-    removed. 
-    """
-    if not val:
-        return ""
-    if isinstance(val, basestring):
-        dt = None
-        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
-            try:
-                dt = datetime.datetime.strptime(val, fmt)
-                break
-            except ValueError:
-                continue
-        if dt is None:
-            raise exc.InvalidDateTimeString("The supplied value '%s' does not match either of the formats "
-                    "'YYYY-MM-DD HH:MM:SS' or 'YYYY-MM-DD'." % val)
-    return dt.isoformat().split(".")[0]
-
-
 
 class CloudLoadBalancer(BaseResource):
     """Represents a Cloud Load Balancer instance."""
@@ -816,10 +794,10 @@ class CloudLoadBalancerManager(BaseManager):
             period = None
         else:
             parts = []
-            startStr = _time_string(start)
+            startStr = utils.iso_time_string(start)
             if startStr:
                 parts.append("startTime=%s" % startStr)
-            endStr = _time_string(end)
+            endStr = utils.iso_time_string(end)
             if endStr:
                 parts.append("endTime=%s" % endStr)
             period = "&".join(parts).strip("&")

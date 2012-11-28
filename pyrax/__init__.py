@@ -363,7 +363,7 @@ def connect_to_cloud_dns(region=None):
     ep = _get_service_endpoint("dns", region)
     cloud_dns = CloudDNSClient(identity.username, identity.api_key,
             region_name=region, management_url=ep, auth_token=identity.token,
-#            http_log_debug=True,
+            http_log_debug=True,
             tenant_id=identity.tenant_id, service_type="rax:dns")
     cloud_dns.user_agent = _make_agent_name(cloud_dns.user_agent)
     return cloud_dns

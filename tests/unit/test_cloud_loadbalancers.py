@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import datetime
 import random
 import unittest
 
@@ -13,7 +12,6 @@ from pyrax.cloudloadbalancers import CloudLoadBalancer
 from pyrax.cloudloadbalancers import Node
 from pyrax.cloudloadbalancers import VirtualIP
 from pyrax.cloudloadbalancers import _get_id
-from pyrax.cloudloadbalancers import _time_string
 from pyrax.cloudloadbalancers import assure_parent
 from pyrax.cloudloadbalancers import assure_loadbalancer
 import pyrax.exceptions as exc
@@ -73,22 +71,6 @@ class CloudLoadBalancerTest(unittest.TestCase):
         # Pass the ID
         ret = client.test_method(self.loadbalancer.id)
         self.assertTrue(ret is self.loadbalancer)
-
-    def test_time_string_empty(self):
-        testval = None
-        self.assertEqual(_time_string(testval), "")
-
-    def test_time_string_invalid(self):
-        testval = "abcde"
-        self.assertRaises(exc.InvalidDateTimeString, _time_string, testval)
-
-    def test_time_string_date(self):
-        dt = "1999-12-31"
-        self.assertEqual(_time_string(dt), "1999-12-31T00:00:00")
-
-    def test_time_string_datetime(self):
-        dt = "1999-12-31 23:59:59"
-        self.assertEqual(_time_string(dt), "1999-12-31T23:59:59")
 
     def test_add_nodes_client(self):
         clt = self.client

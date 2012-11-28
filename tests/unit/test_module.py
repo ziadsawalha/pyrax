@@ -111,20 +111,11 @@ class PyraxInitTest(unittest.TestCase):
         pyrax.set_default_region(new_region)
         self.assertEqual(pyrax.default_region, new_region)
 
-    def test_fix_uri_other(self):
+    def test_fix_uri(self):
         region = "abc"
-        svc = "other"
-        orig = "http://example.com/v1.0/fake"
-        expected = "http://abc.example.com/v1.0/fake"
-        fixed = pyrax._fix_uri(orig, region, svc)
-        self.assertEqual(fixed, expected)
-
-    def test_fix_uri_compute(self):
-        region = "abc"
-        svc = "compute"
         orig = "http://example.com/v1.0/fake"
         expected = "http://abc.example.com/v2/fake"
-        fixed = pyrax._fix_uri(orig, region, svc)
+        fixed = pyrax._fix_uri(orig, region)
         self.assertEqual(fixed, expected)
 
     def test_make_agent_name(self):

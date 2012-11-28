@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import datetime
 import fnmatch
 import hashlib
 import os
@@ -208,6 +209,28 @@ def wait_until(obj, att, desired, interval=5, attempts=10, verbose=False):
         time.sleep(interval)
         attempt += 1
     return False
+
+
+def iso_time_string(val):
+    """
+    Takes either a date, datetime or a string, and returns the standard ISO
+    formatted string for that date/time, with any fractional second portion
+    removed. 
+    """
+    if not val:
+        return ""
+    if isinstance(val, basestring):
+        dt = None
+        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+            try:
+                dt = datetime.datetime.strptime(val, fmt)
+                break
+            except ValueError:
+                continue
+        if dt is None:
+            raise exc.InvalidDateTimeString("The supplied value '%s' does not match either of the formats "
+                    "'YYYY-MM-DD HH:MM:SS' or 'YYYY-MM-DD'." % val)
+    return dt.isoformat().split(".")[0]
 
 
 def env(*args, **kwargs):

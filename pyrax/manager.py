@@ -188,12 +188,15 @@ class BaseManager(object):
         """
         matches = self.findall(**kwargs)
         num_matches = len(matches)
-        if not num_matches:
-            msg = "No %s matching: %s." % (self.resource_class.__name__, kwargs)
-            raise exc.NotFound(404, msg)
-        elif num_matches > 1:
+#        if not num_matches:
+#            msg = "No %s matching: %s." % (self.resource_class.__name__, kwargs)
+#            raise exc.NotFound(404, msg)
+#        elif num_matches > 1:
+        if num_matches > 1:
             msg = "More than one %s matching: %s." % (self.resource_class.__name__, kwargs)
             raise exc.NoUniqueMatch(400, msg)
+        if num_matches == 0:
+            return []
         else:
             return matches[0]
 
