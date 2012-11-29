@@ -38,6 +38,9 @@ class CDNFailed(PyraxException):
 class DomainCreationFailed(PyraxException):
     pass
 
+class DomainUpdateFailed(PyraxException):
+    pass
+
 class EndpointNotFound(PyraxException):
     pass
 
@@ -84,6 +87,9 @@ class InvalidVirtualIPVersion(PyraxException):
     pass
 
 class InvalidVolumeResize(PyraxException):
+    pass
+
+class MissingDNSSettings(PyraxException):
     pass
 
 class MissingHealthMonitorSettings(PyraxException):

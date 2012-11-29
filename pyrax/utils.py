@@ -252,6 +252,9 @@ def get_id(id_or_obj):
     Returns the 'id' attribute of 'id_or_obj' if present; if not,
     returns 'id_or_obj'.
     """
+    if isinstance(id_or_obj, (basestring, int)):
+        # It's an ID
+        return id_or_obj
     try:
         return id_or_obj.id
     except AttributeError:
