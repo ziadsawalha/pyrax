@@ -87,7 +87,7 @@ class CloudDNSManager(BaseManager):
         the BaseManager method must be overridden here.
         """
         url = "%s?showRecords=true&showSubdomains=true" % url
-        _resp, body = self.api.method_get(url)
+        _resp, body = self.api.method_get_alt(url)
         body["records"] = body.pop("recordsList").get("records", [])
         return self.resource_class(self, body, loaded=True)
 
@@ -274,6 +274,32 @@ class CloudDNSClient(BaseClient):
                     },
                 }]}
         return body
+
+
+    def method_get_alt(self, url, **kwargs):
+        import urllib2
+        import json
+        kwargs.setdefault("headers", kwargs.get("headers", {}))
+        kwargs["headers"]["X-Auth-Token"] = self.auth_token
+        if self.tenant_id:
+            kwargs["headers"]["X-Auth-Project-Id"] = self.tenant_id
+        kwargs["headers"]["User-Agent"] = self.user_agent
+        kwargs["headers"]["Accept"] = "application/json"
+        if "body" in kwargs:
+            kwargs["headers"]["Content-Type"] = "application/json"
+            kwargs["body"] = json.dumps(kwargs["body"])
+        full_url = self.management_url + url
+        req = urllib2.Request(full_url, headers=kwargs["headers"])
+        print "HDR"*28
+        print kwargs
+        print "URL"*28
+        print full_url
+        print "URL"*28
+        resp = urllib2.urlopen(req)
+        print "RESP"
+        print "'"*88
+        print resp.read()
+        print "'"*88
 
 
     def changes_since(self, domain, date_or_datetime):
