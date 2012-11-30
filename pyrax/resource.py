@@ -31,6 +31,10 @@ class BaseResource(object):
     """
     HUMAN_ID = False
     NAME_ATTR = "name"
+    # Some resource do not have any additional details to lazy load,
+    # so skip the unneeded API call by setting this to False.
+    GET_DETAILS = True
+
 
     def __init__(self, manager, info, loaded=False):
         self._loaded = loaded
@@ -86,6 +90,8 @@ class BaseResource(object):
         # set 'loaded' first ... so if we have to bail, we know we tried.
         self.loaded = True
         if not hasattr(self.manager, "get"):
+            return
+        if not self.GET_DETAILS:
             return
         new = self.manager.get(self)
         if new:
