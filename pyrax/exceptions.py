@@ -38,6 +38,12 @@ class CDNFailed(PyraxException):
 class DomainCreationFailed(PyraxException):
     pass
 
+class DomainDeletionFailed(PyraxException):
+    pass
+
+class DomainRecordAdditionFailed(PyraxException):
+    pass
+
 class DomainUpdateFailed(PyraxException):
     pass
 

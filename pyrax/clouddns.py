@@ -40,12 +40,26 @@ def assure_domain(fnc):
     return _wrapped
 
 
+class CloudDNSRecord(BaseResource):
+    """
+    This class represents a domain record.
+    """
+    GET_DETAILS = False
+
+
 class CloudDNSDomain(BaseResource):
     """
-    This class represents the available instance configurations, or 'flavors',
-    which you use to define the memory and CPU size of your instance. These
-    objects are read-only.
+    This class represents a DNS domain.
     """
+    def delete(self, delete_subdomains=False):
+        """
+        Deletes this domain and all of its resource records. If this domain
+        has subdomains, each subdomain will now become a root domain.
+        If you wish to also delete any subdomains, pass True to 'delete_subdomains'.
+        """
+        self.manager.delete(self, delete_subdomains=delete_subdomains)
+
+
     def export(self):
         """
         Provides the BIND (Berkeley Internet Name Domain) 9 formatted contents
@@ -67,7 +81,7 @@ class CloudDNSDomain(BaseResource):
     def update(self, emailAddress=None, ttl=None, comment=None):
         """
         Provides a way to modify the following attributes of a domain
-        record:
+        entry:
             - email address
             - ttl setting
             - comment
@@ -77,8 +91,54 @@ class CloudDNSDomain(BaseResource):
         return body
 
 
+    def list_subdomains(self):
+        """
+        Returns a list of all subdomains for this domain.
+        """
+        resp, body = self.manager.list_subdomains(self)
+        return body
+
+
+    def list_records(self):
+        """
+        Returns a list of all records configured for this domain.
+        """
+        return self.manager.list_domain_records(self)
+
+
+    def search_records(self, record_type, name=None, data=None):
+        """
+        Returns a list of all records configured for this domain that match
+        the supplied search criteria.
+        """
+        return self.manager.search_records(self, record_type=record_type,
+                name=name, data=data)
+
+
+    def add_records(self, records):
+        """
+        Adds the records to this domain. Each record should be a dict with the
+        following keys:
+            type (required)
+            name (required)
+            data (required)
+            ttl (optional)
+            comment (optional)
+            priority (required for MX and SRV records; forbidden otherwise)
+        """
+        self.manager.add_domain_records(self, records)
+
+
+
 class CloudDNSManager(BaseManager):
-    def _get(self, url):
+    def __init__(self, api, resource_class=None, response_key=None,
+            plural_response_key=None, uri_base=None):
+        super(CloudDNSManager, self).__init__(api, resource_class=resource_class,
+                response_key=response_key, plural_response_key=plural_response_key,
+                uri_base=uri_base)
+
+
+    def _get(self, uri):
         """
         Handles the communication with the API when getting
         a specific resource managed by this class.
@@ -86,13 +146,15 @@ class CloudDNSManager(BaseManager):
         Because DNS returns a different format for the body,
         the BaseManager method must be overridden here.
         """
-        url = "%s?showRecords=true&showSubdomains=true" % url
-        _resp, body = self.api.method_get(url)
+        # SLOW!!!!
+#        uri = "%s?showRecords=true&showSubdomains=true" % uri
+        uri = "%s?showRecords=true&showSubdomains=false" % uri
+        _resp, body = self.api.method_get(uri)
         body["records"] = body.pop("recordsList").get("records", [])
         return self.resource_class(self, body, loaded=True)
 
 
-    def _async_call(self, url, body=None, method="GET", error_class=None,
+    def _async_call(self, uri, body=None, method="GET", error_class=None,
             has_response=True, *args, **kwargs):
         """
         Handles asynchronous call/responses for the DNS API.
@@ -112,18 +174,17 @@ class CloudDNSManager(BaseManager):
                 }
         api_method = api_methods[method]
         if body is None:
-            _resp, ret_body = api_method(url, *args, **kwargs)
+            _resp, ret_body = api_method(uri, *args, **kwargs)
         else:
-            _resp, ret_body = api_method(url, body=body, *args, **kwargs)
+            _resp, ret_body = api_method(uri, body=body, *args, **kwargs)
         callbackURL = ret_body["callbackUrl"].split("/status/")[-1]
         massagedURL = "/status/%s?showDetails=true" % callbackURL
         start = time.time()
         while (ret_body["status"] == "RUNNING") and (time.time() - start < WAIT_LIMIT):
             _resp, ret_body= self.api.method_get(massagedURL)
         if error_class and (ret_body["status"] == "ERROR"):
-            err = ret_body["error"]
-            msg = "%s (%s)" % (err["details"], err["code"])
-            raise error_class(msg)
+            #This call will handle raising the error.
+            self._process_async_error(ret_body, error_class)
         if has_response:
             ret = _resp, ret_body["response"]
         else:
@@ -131,7 +192,31 @@ class CloudDNSManager(BaseManager):
         return ret
 
 
-    def _create(self, url, body, records=None, subdomains=None,
+    def _process_async_error(self, ret_body, error_class):
+        """
+        The DNS API does not return a consistent format for their error
+        messages. This abstracts out the differences in order to present
+        a single unified message in the exception to be raised.
+        """
+        def _fmt_error(err):
+            # Remove the cumbersome Java-esque message
+            details = err["details"].split(".")[-1].replace("\n", " ")
+            if not details:
+                details = err["message"]
+            return "%s (%s)" % (details, err["code"])
+
+        error = ret_body["error"]
+        if "failedItems" in error:
+            # Multi-error response
+            faults = error["failedItems"]["faults"]
+            msgs = [_fmt_error(fault) for fault in faults]
+            msg = "\n".join(msgs)
+        else:
+            msg = _fmt_error(error)
+        raise error_class(msg)
+
+
+    def _create(self, uri, body, records=None, subdomains=None,
             return_none=False, return_raw=False, **kwargs):
         """
         Handles the communication with the API when creating a new
@@ -156,10 +241,23 @@ class CloudDNSManager(BaseManager):
              "emailAddress" : "sample@rackspace.com"}
         """
         self.run_hooks("modify_body_for_create", body, **kwargs)
-        _resp, ret_body = self._async_call(url, body=body, method="POST",
+        _resp, ret_body = self._async_call(uri, body=body, method="POST",
                 error_class=exc.DomainCreationFailed)
         response_body = ret_body[self.response_key][0]
         return self.resource_class(self, response_body)
+
+
+    def delete(self, domain, delete_subdomains=False):
+        """
+        Deletes the specified domain and all of its resource records. If the
+        domain has subdomains, each subdomain will now become a root domain.
+        If you wish to also delete any subdomains, pass True to 'delete_subdomains'.
+        """
+        uri = "/%s/%s" % (self.uri_base, utils.get_id(domain))
+        if delete_subdomains:
+            uri = "%s?deleteSubdomains=true" % uri
+        _resp, ret_body = self._async_call(uri, method="DELETE",
+                error_class=exc.DomainDeletionFailed, has_response=False)
 
 
     def findall(self, **kwargs):
@@ -193,8 +291,8 @@ class CloudDNSManager(BaseManager):
                 'example.com.\t3600\tIN\tNS\tdns2.stabletransit.com.',
              u'id': 1111111}
         """
-        url = "/domains/%s/export" % utils.get_id(domain)
-        resp, ret_body = self._async_call(url, method="GET", error_class=exc.NotFound)
+        uri = "/domains/%s/export" % utils.get_id(domain)
+        resp, ret_body = self._async_call(uri, method="GET", error_class=exc.NotFound)
         return resp, ret_body
 
 
@@ -203,12 +301,12 @@ class CloudDNSManager(BaseManager):
         Takes a string in the BIND 9 format and creates a new domain. See the
         'export_domain()' method for a description of the format.
         """
-        url = "/domains/import"
+        uri = "/domains/import"
         body = {"domains" : [{
                 "contentType" : "BIND_9",
                 "contents" : domain_data,
                 }]}
-        resp, ret_body = self._async_call(url, method="POST", body=body,
+        resp, ret_body = self._async_call(uri, method="POST", body=body,
                 error_class=exc.DomainCreationFailed)
         return resp, ret_body
 
@@ -223,7 +321,7 @@ class CloudDNSManager(BaseManager):
         """
         if not any((emailAddress, ttl, comment)):
             raise exc.MissingDNSSettings("No settings provided to update_domain().")
-        url = "/domains/%s" % utils.get_id(domain)
+        uri = "/domains/%s" % utils.get_id(domain)
         body = {"comment" : comment,
                 "ttl" : ttl,
                 "emailAddress" : emailAddress,
@@ -232,10 +330,73 @@ class CloudDNSManager(BaseManager):
                 if val is None]
         for none_key in none_keys:
             body.pop(none_key)
-        resp, ret_body = self._async_call(url, method="PUT", body=body,
+        resp, ret_body = self._async_call(uri, method="PUT", body=body,
                 error_class=exc.DomainUpdateFailed, has_response=False)
         return resp, ret_body
 
+
+    def list_subdomains(self, domain):
+        """
+        Returns a list of all subdomains of the specified domain.
+        """
+        uri = "/domains/%s/subdomains" % utils.get_id(domain)
+        resp, body = self.api.method_get(uri)
+        domains = body.get("domains", [])
+        return [CloudDNSDomain(self, domain, loaded=False)
+                for domain in domains if domain]
+
+
+    def list_domain_records(self, domain):
+        """
+        Returns a list of all records configured for the specified domain.
+        """
+        uri = "/domains/%s/records" % utils.get_id(domain)
+        resp, body = self.api.method_get(uri)
+        records = body.get("records", [])
+        return [CloudDNSRecord(self, record, loaded=False)
+                for record in records if record]
+
+
+    def search_domain_records(self, domain, record_type, name=None, data=None):
+        """
+        Returns a list of all records configured for the specified domain that match
+        the supplied search criteria.
+        """
+        search_params = []
+        if name:
+            search_params.append("name=%s" % name)
+        if data:
+            search_params.append("data=%s" % data)
+        query_string = "&".join(search_params)
+        uri = "/domains/%s/records?type=%s" % (utils.get_id(domain), record_type)
+        if query_string:
+            uri = "%s&%s" % (uri, query_string)
+        resp, body = self.api.method_get(uri)
+        records = body.get("records", [])
+        return [CloudDNSRecord(self, record, loaded=False)
+                for record in records if record]
+
+
+    def add_domain_records(self, domain, records):
+        """
+        Adds the records to this domain. Each record should be a dict with the
+        following keys:
+            type (required)
+            name (required)
+            data (required)
+            ttl (optional)
+            comment (optional)
+            priority (required for MX and SRV records; forbidden otherwise)
+        """
+        if isinstance(records, dict):
+            # Single record passed
+            records = [records]
+        uri = "/domains/%s/records" % utils.get_id(domain)
+        body = {"records": records}
+        resp, ret_body = self._async_call(uri, method="POST", body=body,
+                error_class=exc.DomainRecordAdditionFailed, has_response=False)
+        return resp, ret_body
+        
 
 
 class CloudDNSClient(BaseClient):
@@ -248,8 +409,8 @@ class CloudDNSClient(BaseClient):
         to handle flavors.
         """
         self._manager = CloudDNSManager(self, resource_class=CloudDNSDomain,
-               response_key="domains", plural_response_key="domains",
-               uri_base="domains")
+                response_key="domains", plural_response_key="domains",
+                uri_base="domains")
 
 
     def _create_body(self, name, emailAddress, ttl=3600, comment=None,
@@ -344,6 +505,52 @@ class CloudDNSClient(BaseClient):
         """
         resp, body = self._manager.update_domain(domain, emailAddress=emailAddress,
                 ttl=ttl, comment=comment)
+
+
+    def delete_domain(self, domain, delete_subdomains=False):
+        """
+        Deletes the specified domain and all of its resource records. If the
+        domain has subdomains, each subdomain will now become a root domain.
+        If you wish to also delete any subdomains, pass True to 'delete_subdomains'.
+        """
+        self._manager.delete(domain, delete_subdomains=delete_subdomains)
+
+
+    def list_subdomains(self, domain):
+        """
+        Returns a list of all subdomains for the specified domain.
+        """
+        return self._manager.list_subdomains(domain)
+
+
+    def list_domain_records(self, domain):
+        """
+        Returns a list of all records configured for the specified domain.
+        """
+        return self._manager.list_domain_records(domain)
+
+
+    def search_domain_records(self, domain, record_type, name=None, data=None):
+        """
+        Returns a list of all records configured for the specified domain that match
+        the supplied search criteria.
+        """
+        return self._manager.search_domain_records(domain, record_type=record_type,
+                name=name, data=data)
+
+
+    def add_domain_records(self, domain, records):
+        """
+        Adds the records to this domain. Each record should be a dict with the
+        following keys:
+            type (required)
+            name (required)
+            data (required)
+            ttl (optional)
+            comment (optional)
+            priority (required for MX and SRV records; forbidden otherwise)
+        """
+        return self._manager.add_domain_records(domain, records)
 
 
     def get_absolute_limits(self):
