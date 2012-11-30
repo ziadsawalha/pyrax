@@ -37,17 +37,6 @@ except NameError:
         return True not in (not x for x in iterable)
 
 
-def getid(obj):
-    """
-    Abstracts the common pattern of allowing both an object or an object's ID
-    as a parameter when dealing with relationships.
-    """
-    try:
-        return obj.id
-    except AttributeError:
-        return obj
-
-
 
 class BaseManager(object):
     """
@@ -81,7 +70,7 @@ class BaseManager(object):
 
     def get(self, item):
         """Gets a specific item."""
-        uri = "/%s/%s" % (self.uri_base, getid(item))
+        uri = "/%s/%s" % (self.uri_base, utils.get_id(item))
         return self._get(uri)
 
 
@@ -98,7 +87,7 @@ class BaseManager(object):
 
     def delete(self, item):
         """Deletes the specified item."""
-        uri = "/%s/%s" % (self.uri_base, getid(item))
+        uri = "/%s/%s" % (self.uri_base, utils.get_id(item))
         return self._delete(uri)
 
 
@@ -174,7 +163,7 @@ class BaseManager(object):
         Several API calls are lumped under the 'action' API. This
         is the generic handler for such calls.
         """
-        uri = "/%s/%s/action" % (self.uri_base, getid(item))
+        uri = "/%s/%s/action" % (self.uri_base, utils.get_id(item))
         action_body = {action_type: body}
         return self.api.method_post(uri, body=action_body)
 
