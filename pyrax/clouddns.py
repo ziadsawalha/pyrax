@@ -18,8 +18,10 @@
 #    under the License.
 
 from functools import wraps
+import json
 import time
 
+import pyrax
 from pyrax.client import BaseClient
 import pyrax.exceptions as exc
 from pyrax.manager import BaseManager
@@ -60,6 +62,33 @@ class CloudDNSDomain(BaseResource):
         self.manager.delete(self, delete_subdomains=delete_subdomains)
 
 
+    def changes_since(self, date_or_datetime):
+        """
+        Get the changes for this domain since the specified date/datetime.
+        The date can be one of:
+            - a Python datetime object
+            - a Python date object
+            - a string in the format 'YYYY-MM-YY HH:MM:SS'
+            - a string in the format 'YYYY-MM-YY'
+
+        It returns a list of dicts, whose keys depend on the specific change
+        that was made. A simple example of such a change dict:
+
+            {u'accountId': 000000,
+             u'action': u'update',
+             u'changeDetails': [{u'field': u'serial_number',
+               u'newValue': u'1354038941',
+               u'originalValue': u'1354038940'},
+              {u'field': u'updated_at',
+               u'newValue': u'Tue Nov 27 17:55:41 UTC 2012',
+               u'originalValue': u'Tue Nov 27 17:55:40 UTC 2012'}],
+             u'domain': u'example.com',
+             u'targetId': 00000000,
+             u'targetType': u'Domain'}
+        """
+        return self.manager.changes_since(self, date_or_datetime)
+
+
     def export(self):
         """
         Provides the BIND (Berkeley Internet Name Domain) 9 formatted contents
@@ -74,8 +103,7 @@ class CloudDNSDomain(BaseResource):
                 'example.com.\t3600\tIN\tNS\tdns2.stabletransit.com.',
              u'id': 1111111}
         """
-        resp, body = self.manager.export_domain(self)
-        return body
+        return self.manager.export_domain(self)
 
 
     def update(self, emailAddress=None, ttl=None, comment=None):
@@ -103,7 +131,7 @@ class CloudDNSDomain(BaseResource):
         """
         Returns a list of all records configured for this domain.
         """
-        return self.manager.list_domain_records(self)
+        return self.manager.list_records(self)
 
 
     def search_records(self, record_type, name=None, data=None):
@@ -126,7 +154,23 @@ class CloudDNSDomain(BaseResource):
             comment (optional)
             priority (required for MX and SRV records; forbidden otherwise)
         """
-        self.manager.add_domain_records(self, records)
+        self.manager.add_records(self, records)
+
+
+    def update_record(self, record, name, data=None, priority=None,
+            ttl=None, comment=None):
+        """
+        Modifie an existing record for this domain.
+        """
+        return self.manager.update_record(self, record, name, data=data,
+                priority=priority, ttl=ttl, comment=comment)
+
+
+    def delete_record(self, record):
+        """
+        Deletes an existing record for this domain.
+        """
+        return self.manager.delete_record(self, record)
 
 
 
@@ -189,6 +233,10 @@ class CloudDNSManager(BaseManager):
             ret = _resp, ret_body["response"]
         else:
             ret = _resp, ret_body
+        try:
+            body = json.loads(body)
+        except Exception:
+            pass
         return ret
 
 
@@ -277,6 +325,37 @@ class CloudDNSManager(BaseManager):
             return super(CloudDNSManager, self).findall(**kwargs)
 
 
+    def changes_since(self, domain, date_or_datetime):
+        """
+        Get the changes for a domain since the specified date/datetime.
+        The date can be one of:
+            - a Python datetime object
+            - a Python date object
+            - a string in the format 'YYYY-MM-YY HH:MM:SS'
+            - a string in the format 'YYYY-MM-YY'
+
+        It returns a list of dicts, whose keys depend on the specific change
+        that was made. A simple example of such a change dict:
+
+            {u'accountId': 000000,
+             u'action': u'update',
+             u'changeDetails': [{u'field': u'serial_number',
+               u'newValue': u'1354038941',
+               u'originalValue': u'1354038940'},
+              {u'field': u'updated_at',
+               u'newValue': u'Tue Nov 27 17:55:41 UTC 2012',
+               u'originalValue': u'Tue Nov 27 17:55:40 UTC 2012'}],
+             u'domain': u'example.com',
+             u'targetId': 00000000,
+             u'targetType': u'Domain'}
+        """
+        domain_id = utils.get_id(domain)
+        dt = utils.iso_time_string(date_or_datetime, show_tzinfo=True)
+        uri = "/domains/%s/changes?since=%s" % (domain_id, dt)
+        resp, body = self.api.method_get(uri)
+        return body.get("changes", [])
+
+
     def export_domain(self, domain):
         """
         Provides the BIND (Berkeley Internet Name Domain) 9 formatted contents
@@ -293,7 +372,7 @@ class CloudDNSManager(BaseManager):
         """
         uri = "/domains/%s/export" % utils.get_id(domain)
         resp, ret_body = self._async_call(uri, method="GET", error_class=exc.NotFound)
-        return resp, ret_body
+        return ret_body
 
 
     def import_domain(self, domain_data):
@@ -346,7 +425,7 @@ class CloudDNSManager(BaseManager):
                 for domain in domains if domain]
 
 
-    def list_domain_records(self, domain):
+    def list_records(self, domain):
         """
         Returns a list of all records configured for the specified domain.
         """
@@ -357,7 +436,7 @@ class CloudDNSManager(BaseManager):
                 for record in records if record]
 
 
-    def search_domain_records(self, domain, record_type, name=None, data=None):
+    def search_records(self, domain, record_type, name=None, data=None):
         """
         Returns a list of all records configured for the specified domain that match
         the supplied search criteria.
@@ -377,7 +456,7 @@ class CloudDNSManager(BaseManager):
                 for record in records if record]
 
 
-    def add_domain_records(self, domain, records):
+    def add_records(self, domain, records):
         """
         Adds the records to this domain. Each record should be a dict with the
         following keys:
@@ -397,6 +476,115 @@ class CloudDNSManager(BaseManager):
                 error_class=exc.DomainRecordAdditionFailed, has_response=False)
         return resp, ret_body
         
+
+    def update_record(self, domain, record, name, data=None, priority=None,
+            ttl=None, comment=None):
+        """
+        Modifies an existing record for a domain.
+        """
+        rec_id = utils.get_id(record)
+        uri = "/domains/%s/records/%s" % (utils.get_id(domain), rec_id)
+        body = {"name": name}
+        all_opts = (("data", data), ("priority", priority), ("ttl", ttl), ("comment", comment))
+        opts = [(k, v) for k, v in all_opts if v is not None]
+        body.update(dict(opts))
+        resp, ret_body = self._async_call(uri, method="PUT", body=body,
+                error_class=exc.DomainRecordUpdateFailed, has_response=False)
+        return resp, ret_body
+
+
+    def delete_record(self, domain, record):
+        """
+        Deletes an existing record for a domain.
+        """
+        uri = "/domains/%s/records/%s" % (utils.get_id(domain), utils.get_id(record))
+        resp, ret_body = self._async_call(uri, method="DELETE",
+                error_class=exc.DomainRecordDeletionFailed, has_response=False)
+        return resp, ret_body
+
+
+    def _get_ptr_details(self, device, device_type):
+        """
+        Takes a device and device type and returns the corresponding HREF link
+        and service name for use with PTR record management.
+        """
+        if device_type.lower().startswith("load"):
+            ep = pyrax._get_service_endpoint("load_balancer")
+            svc = "loadbalancers"
+            svc_name = "cloudLoadBalancers"
+        else:
+            ep = pyrax._get_service_endpoint("compute")
+            svc = "servers"
+            svc_name = "cloudServersOpenStack"
+        href = "%s/%s/%s" % (ep, svc, utils.get_id(device))
+        return (href, svc_name)
+
+
+    def list_ptr_records(self, device, device_type="server"):
+        href, svc_name = self._get_ptr_details(device, device_type)
+        uri = "/rdns/%s?href=%s" % (svc_name, href)
+        try:
+            resp, ret_body = self.api.method_get(uri)
+        except exc.NotFound:
+            return []
+        return ret_body["records"]
+
+
+    def add_ptr_records(self, records, device, device_type="server"):
+        """
+        Adds one or more PTR records to the specified device.
+        """
+        href, svc_name = self._get_ptr_details(device, device_type)
+        body = {"recordsList": {
+                   "records": records},
+                "link": {
+                    "content": "",
+                    "href": href,
+                    "rel": svc_name,
+                }}
+        uri = "/rdns"
+        resp, ret_body = self.api.method_post(uri, body=body)
+
+
+    def update_ptr_record(self, record, device, device_type="server",
+            domain_name=None, data=None, ttl=None, comment=None):
+        """
+        Updates a PTR record with the supplied values.
+        """
+        href, svc_name = self._get_ptr_details(device, device_type)
+        rec = {"name": domain_name,
+              "id": utils.get_id(record),
+              "type": "PTR",
+              "data": data,
+            }
+        if ttl is not None:
+            # Minimum TTL is 300 seconds
+            rec["ttl"] = max(300, ttl)
+        if comment is not None:
+            # Maximum comment length is 160 chars
+            rec["comment"] = comment[:160]
+        body = {"recordsList": {
+                   "records": [rec]},
+                "link": {
+                    "content": "",
+                    "href": href,
+                    "rel": svc_name,
+                }}
+        uri = "/rdns"
+        resp, ret_body = self.api.method_put(uri, body=body)
+
+
+    def delete_ptr_records(self, device, device_type="server", ip_address=None):
+        """
+        Deletes the PTR records for the specified device. If 'ip_address' is supplied,
+        only the PTR records with that IP address will be deleted.
+        """
+        href, svc_name = self._get_ptr_details(device, device_type)
+        uri = "/rdns/%s?href=%s" % (svc_name, href)
+        if ip_address:
+            uri = "%s&ip=%s" % (uri, ip_address)
+        resp, ret_body = self.api.method_delete(uri)
+
 
 
 class CloudDNSClient(BaseClient):
@@ -461,11 +649,7 @@ class CloudDNSClient(BaseClient):
              u'targetId': 00000000,
              u'targetType': u'Domain'}
         """
-        domain_id = utils.get_id(domain)
-        dt = utils.iso_time_string(date_or_datetime, show_tzinfo=True)
-        uri = "/domains/%s/changes?since=%s" % (domain_id, dt)
-        resp, body = self.method_get(uri)
-        return body.get("changes", [])
+        return self._manager.changes_since(domain, date_or_datetime)
 
 
     def export_domain(self, domain):
@@ -482,8 +666,7 @@ class CloudDNSClient(BaseClient):
                 'example.com.\t3600\tIN\tNS\tdns2.stabletransit.com.',
              u'id': 1111111}
         """
-        resp, body = self._manager.export_domain(domain)
-        return body
+        return self._manager.export_domain(domain)
 
 
     def import_domain(self, domain_data):
@@ -523,23 +706,23 @@ class CloudDNSClient(BaseClient):
         return self._manager.list_subdomains(domain)
 
 
-    def list_domain_records(self, domain):
+    def list_records(self, domain):
         """
         Returns a list of all records configured for the specified domain.
         """
-        return self._manager.list_domain_records(domain)
+        return self._manager.list_records(domain)
 
 
-    def search_domain_records(self, domain, record_type, name=None, data=None):
+    def search_records(self, domain, record_type, name=None, data=None):
         """
         Returns a list of all records configured for the specified domain that match
         the supplied search criteria.
         """
-        return self._manager.search_domain_records(domain, record_type=record_type,
+        return self._manager.search_records(domain, record_type=record_type,
                 name=name, data=data)
 
 
-    def add_domain_records(self, domain, records):
+    def add_records(self, domain, records):
         """
         Adds the records to this domain. Each record should be a dict with the
         following keys:
@@ -550,7 +733,49 @@ class CloudDNSClient(BaseClient):
             comment (optional)
             priority (required for MX and SRV records; forbidden otherwise)
         """
-        return self._manager.add_domain_records(domain, records)
+        return self._manager.add_records(domain, records)
+
+
+    def update_record(self, domain, record, name, data=None, priority=None,
+            ttl=None, comment=None):
+        """
+        Modifies an existing record for a domain.
+        """
+        return self._manager.update_record(domain, record, name, data=data,
+                priority=priority, ttl=ttl, comment=comment)
+
+
+    def delete_record(self, domain, record):
+        return self._manager.delete_record(domain, record)
+
+
+    def list_ptr_records(self, device, device_type="server"):
+        return self._manager.list_ptr_records(device, device_type=device_type)
+
+
+    def add_ptr_records(self, records, device, device_type="server"):
+        """
+        Adds one or more PTR records to the specified device.
+        """
+        return self._manager.add_ptr_records(records, device, device_type=device_type)
+
+
+    def update_ptr_record(self, record, device, device_type="server", domain_name=None,
+            data=None, ttl=None, comment=None):
+        """
+        Updates a PTR record with the supplied values.
+        """
+        return self._manager.update_ptr_record(record, device, device_type=device_type,
+                domain_name=domain_name, data=data, ttl=ttl, comment=comment)
+
+
+    def delete_ptr_records(self, device, device_type="server", ip_address=None):
+        """
+        Deletes the PTR records for the specified device. If 'ip_address' is supplied,
+        only the PTR records with that IP address will be deleted.
+        """
+        return self._manager.delete_ptr_records(device, device_type=device_type,
+                ip_address=ip_address)
 
 
     def get_absolute_limits(self):

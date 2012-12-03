@@ -44,6 +44,12 @@ class DomainDeletionFailed(PyraxException):
 class DomainRecordAdditionFailed(PyraxException):
     pass
 
+class DomainRecordDeletionFailed(PyraxException):
+    pass
+
+class DomainRecordUpdateFailed(PyraxException):
+    pass
+
 class DomainUpdateFailed(PyraxException):
     pass
 

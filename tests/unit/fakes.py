@@ -18,6 +18,7 @@ from pyrax.cloudloadbalancers import CloudLoadBalancerClient
 from pyrax.cloudloadbalancers import Node
 from pyrax.cloudloadbalancers import VirtualIP
 from pyrax.clouddns import CloudDNSClient
+from pyrax.clouddns import CloudDNSDomain
 from pyrax.clouddns import CloudDNSManager
 
 import pyrax.exceptions as exc
@@ -197,6 +198,11 @@ class FakeDNSClient(CloudDNSClient):
     def __init__(self, *args, **kwargs):
         super(FakeDNSClient, self).__init__("fakeuser",
                 "fakepassword", *args, **kwargs)
+
+
+class FakeDNSDomain(CloudDNSDomain):
+    def __init__(self, *args, **kwargs):
+        self.id = utils.random_name()
 
 
 class FakeNovaVolumeClient(BaseClient):

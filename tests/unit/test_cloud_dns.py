@@ -25,6 +25,7 @@ class CloudDNSTest(unittest.TestCase):
 
     def setUp(self):
         self.client = fakes.FakeDNSClient()
+        self.domain = fakes.FakeDNSDomain()
 
     def tearDown(self):
         self.client = None
@@ -64,7 +65,6 @@ class CloudDNSTest(unittest.TestCase):
         dom = mgr._create("fake", {})
         self.assertTrue(isinstance(dom, CloudDNSDomain))
 
-
     def test_manager_create_error(self):
         clt = self.client
         mgr = clt._manager
@@ -88,15 +88,37 @@ class CloudDNSTest(unittest.TestCase):
     def test_manager_findall_default(self):
         clt = self.client
         mgr = clt._manager
+        sav = BaseManager.findall
         BaseManager.findall = Mock()
         mgr.findall(foo="bar")
         BaseManager.findall.assert_called_once_with(foo="bar")
+        BaseManager.findall = sav
 
     def test_create_body(self):
         clt = self.client
         fake_name = utils.random_name()
         body = clt._create_body(fake_name, "fake@fake.com")
         self.assertEqual(body["domains"][0]["name"], fake_name)
+
+    def test_changes_since(self):
+        clt = self.client
+        dom = self.domain
+        clt.method_get = Mock(return_value=({}, {"changes": ["fake"]}))
+        dt = "2012-01-01"
+        ret = clt.changes_since(dom, dt)
+        uri = "/domains/%s/changes?since=2012-01-01T00:00:00+0000" % dom.id
+        clt.method_get.assert_called_once_with(uri)
+        self.assertEqual(ret, ["fake"])
+
+    def test_export_domain(self):
+        clt = self.client
+        dom = self.domain
+        export = utils.random_name()
+        clt._manager._async_call = Mock(return_value=({}, export))
+        ret = clt.export_domain(dom)
+        uri = "/domains/%s/export" % dom.id
+        clt._manager._async_call.assert_called_once_with(uri, error_class=exc.NotFound, method="GET")
+        self.assertEqual(ret, export)
 
 
 
