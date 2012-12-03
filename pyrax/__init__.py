@@ -259,6 +259,7 @@ def connect_to_services():
     if services_to_start["dns"]:
         cloud_dns = connect_to_cloud_dns()
 
+
 def _fix_uri(ep, region):
     """
     Compute URIs returned by the "ALL" region need to be manipulated
