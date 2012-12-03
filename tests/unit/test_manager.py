@@ -26,18 +26,6 @@ class ManagerTest(unittest.TestCase):
         self.manager = None
         self.fake_api = None
 
-    def test_getid_ok(self):
-        # The class really doesn't matter
-        x = fakes.FakeException()
-        x.id = "TEST"
-        ret = manager.getid(x)
-        self.assertEqual(ret, x.id)
-
-    def test_getid_no_id(self):
-        x = None
-        ret = manager.getid(x)
-        self.assertEqual(ret, x)
-
     def test_list(self):
         mgr = self.manager
         sav = mgr._list
@@ -220,7 +208,7 @@ class ManagerTest(unittest.TestCase):
         ret = mgr.findall(some_att="ok")
         self.assertTrue(o1 in ret)
         self.assertFalse(o2 in ret)
-        self.assertTrue(o1 in ret)
+        self.assertTrue(o3 in ret)
         mgr.list = sav
 
     def test_findall_bad_att(self):
