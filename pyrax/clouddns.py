@@ -114,17 +114,15 @@ class CloudDNSDomain(BaseResource):
             - ttl setting
             - comment
         """
-        resp, body = self.manager.update_domain(self, emailAddress=emailAddress,
+        return self.manager.update_domain(self, emailAddress=emailAddress,
                 ttl=ttl, comment=comment)
-        return body
 
 
     def list_subdomains(self):
         """
         Returns a list of all subdomains for this domain.
         """
-        resp, body = self.manager.list_subdomains(self)
-        return body
+        return self.manager.list_subdomains(self)
 
 
     def list_records(self):
@@ -387,7 +385,7 @@ class CloudDNSManager(BaseManager):
                 }]}
         resp, ret_body = self._async_call(uri, method="POST", body=body,
                 error_class=exc.DomainCreationFailed)
-        return resp, ret_body
+        return ret_body
 
 
     def update_domain(self, domain, emailAddress=None, ttl=None, comment=None):
@@ -411,7 +409,7 @@ class CloudDNSManager(BaseManager):
             body.pop(none_key)
         resp, ret_body = self._async_call(uri, method="PUT", body=body,
                 error_class=exc.DomainUpdateFailed, has_response=False)
-        return resp, ret_body
+        return ret_body
 
 
     def list_subdomains(self, domain):
@@ -535,6 +533,8 @@ class CloudDNSManager(BaseManager):
         Adds one or more PTR records to the specified device.
         """
         href, svc_name = self._get_ptr_details(device, device_type)
+        if not isinstance(records, (list, tuple)):
+            records = [records]
         body = {"recordsList": {
                    "records": records},
                 "link": {
@@ -625,6 +625,7 @@ class CloudDNSClient(BaseClient):
         return body
 
 
+    @assure_domain
     def changes_since(self, domain, date_or_datetime):
         """
         Get the changes for a domain since the specified date/datetime.
@@ -649,9 +650,10 @@ class CloudDNSClient(BaseClient):
              u'targetId': 00000000,
              u'targetType': u'Domain'}
         """
-        return self._manager.changes_since(domain, date_or_datetime)
+        return domain.changes_since(date_or_datetime)
 
 
+    @assure_domain
     def export_domain(self, domain):
         """
         Provides the BIND (Berkeley Internet Name Domain) 9 formatted contents
@@ -666,7 +668,7 @@ class CloudDNSClient(BaseClient):
                 'example.com.\t3600\tIN\tNS\tdns2.stabletransit.com.',
              u'id': 1111111}
         """
-        return self._manager.export_domain(domain)
+        return domain.export()
 
 
     def import_domain(self, domain_data):
@@ -674,10 +676,10 @@ class CloudDNSClient(BaseClient):
         Takes a string in the BIND 9 format and creates a new domain. See the
         'export_domain()' method for a description of the format.
         """
-        resp, body = self._manager.import_domain(domain_data)
-        return body
+        return self._manager.import_domain(domain_data)
 
 
+    @assure_domain
     def update_domain(self, domain, emailAddress=None, ttl=None, comment=None):
         """
         Provides a way to modify the following attributes of a domain
@@ -686,42 +688,47 @@ class CloudDNSClient(BaseClient):
             - ttl setting
             - comment
         """
-        resp, body = self._manager.update_domain(domain, emailAddress=emailAddress,
+        return domain.update(emailAddress=emailAddress,
                 ttl=ttl, comment=comment)
 
 
+    @assure_domain
     def delete_domain(self, domain, delete_subdomains=False):
         """
         Deletes the specified domain and all of its resource records. If the
         domain has subdomains, each subdomain will now become a root domain.
         If you wish to also delete any subdomains, pass True to 'delete_subdomains'.
         """
-        self._manager.delete(domain, delete_subdomains=delete_subdomains)
+        domain.delete(delete_subdomains=delete_subdomains)
 
 
+    @assure_domain
     def list_subdomains(self, domain):
         """
         Returns a list of all subdomains for the specified domain.
         """
-        return self._manager.list_subdomains(domain)
+        return domain.list_subdomains()
 
 
+    @assure_domain
     def list_records(self, domain):
         """
         Returns a list of all records configured for the specified domain.
         """
-        return self._manager.list_records(domain)
+        return domain.list_records()
 
 
+    @assure_domain
     def search_records(self, domain, record_type, name=None, data=None):
         """
         Returns a list of all records configured for the specified domain that match
         the supplied search criteria.
         """
-        return self._manager.search_records(domain, record_type=record_type,
+        return domain.search_records(record_type=record_type,
                 name=name, data=data)
 
 
+    @assure_domain
     def add_records(self, domain, records):
         """
         Adds the records to this domain. Each record should be a dict with the
@@ -733,20 +740,22 @@ class CloudDNSClient(BaseClient):
             comment (optional)
             priority (required for MX and SRV records; forbidden otherwise)
         """
-        return self._manager.add_records(domain, records)
+        return domain.add_records(records)
 
 
+    @assure_domain
     def update_record(self, domain, record, name, data=None, priority=None,
             ttl=None, comment=None):
         """
         Modifies an existing record for a domain.
         """
-        return self._manager.update_record(domain, record, name, data=data,
+        return domain.update_record(record, name, data=data,
                 priority=priority, ttl=ttl, comment=comment)
 
 
+    @assure_domain
     def delete_record(self, domain, record):
-        return self._manager.delete_record(domain, record)
+        return domain.delete_record(record)
 
 
     def list_ptr_records(self, device, device_type="server"):

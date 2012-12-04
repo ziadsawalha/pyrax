@@ -200,7 +200,22 @@ class FakeDNSClient(CloudDNSClient):
                 "fakepassword", *args, **kwargs)
 
 
+class FakeDNSManager(CloudDNSManager):
+    def __init__(self, api=None, *args, **kwargs):
+        if api is None:
+            api = FakeDNSClient()
+        super(FakeDNSManager, self).__init__(api, *args, **kwargs)
+        self.resource_class = FakeDNSDomain
+        self.uri_base = "domains"
+
+
 class FakeDNSDomain(CloudDNSDomain):
+    def __init__(self, *args, **kwargs):
+        self.id = utils.random_name()
+        self.manager = FakeDNSManager()
+
+
+class FakeDNSDevice(FakeEntity):
     def __init__(self, *args, **kwargs):
         self.id = utils.random_name()
 
