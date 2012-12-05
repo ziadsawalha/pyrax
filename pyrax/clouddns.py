@@ -416,11 +416,15 @@ class CloudDNSManager(BaseManager):
         """
         Returns a list of all subdomains of the specified domain.
         """
-        uri = "/domains/%s/subdomains" % utils.get_id(domain)
+        # The commented-out uri is the official API, but it is
+        # horribly slow.
+#        uri = "/domains/%s/subdomains" % utils.get_id(domain)
+        uri = "/domains?name=%s" % domain.name
         resp, body = self.api.method_get(uri)
-        domains = body.get("domains", [])
-        return [CloudDNSDomain(self, domain, loaded=False)
-                for domain in domains if domain]
+        subdomains = body.get("domains", [])
+        return [CloudDNSDomain(self, subdomain, loaded=False)
+                for subdomain in subdomains
+                if subdomain["id"] != domain.id]
 
 
     def list_records(self, domain):

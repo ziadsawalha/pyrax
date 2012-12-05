@@ -292,7 +292,8 @@ class CloudDNSTest(unittest.TestCase):
         mgr = clt._manager
         dom = self.domain
         clt.method_get = Mock(return_value=({}, {}))
-        uri = "/domains/%s/subdomains" % utils.get_id(dom)
+#        uri = "/domains/%s/subdomains" % utils.get_id(dom)
+        uri = "/domains?name=%s" % dom.name
         clt.list_subdomains(dom)
         clt.method_get.assert_called_once_with(uri)
 
