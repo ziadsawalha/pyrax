@@ -317,8 +317,11 @@ class CloudDNSManager(BaseManager):
         """
         if (len(kwargs) == 1) and ("name" in kwargs):
             # Filtering on name; use the more efficient method.
-            uri = "/%s?name=%s" % (self.uri_base, kwargs["name"])
-            return self._list(uri)
+            nm = kwargs["name"]
+            uri = "/%s?name=%s" % (self.uri_base, nm)
+            matches = self._list(uri)
+            return [match for match in matches
+                if match.name == nm] 
         else:
             return super(CloudDNSManager, self).findall(**kwargs)
 
@@ -697,7 +700,7 @@ class CloudDNSClient(BaseClient):
 
 
     @assure_domain
-    def delete_domain(self, domain, delete_subdomains=False):
+    def delete(self, domain, delete_subdomains=False):
         """
         Deletes the specified domain and all of its resource records. If the
         domain has subdomains, each subdomain will now become a root domain.

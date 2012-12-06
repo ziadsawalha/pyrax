@@ -273,7 +273,7 @@ class CloudDNSTest(unittest.TestCase):
         dom = self.domain
         mgr._async_call = Mock(return_value=({}, {}))
         uri = "/domains/%s" % utils.get_id(dom)
-        clt.delete_domain(dom)
+        clt.delete(dom)
         mgr._async_call.assert_called_once_with(uri, method="DELETE",
                 error_class=exc.DomainDeletionFailed, has_response=False)
 
@@ -283,7 +283,7 @@ class CloudDNSTest(unittest.TestCase):
         dom = self.domain
         mgr._async_call = Mock(return_value=({}, {}))
         uri = "/domains/%s?deleteSubdomains=true" % utils.get_id(dom)
-        clt.delete_domain(dom, delete_subdomains=True)
+        clt.delete(dom, delete_subdomains=True)
         mgr._async_call.assert_called_once_with(uri, method="DELETE",
                 error_class=exc.DomainDeletionFailed, has_response=False)
 
