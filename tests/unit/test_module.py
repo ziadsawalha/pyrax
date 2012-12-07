@@ -39,6 +39,7 @@ class PyraxInitTest(unittest.TestCase):
         pyrax.connect_to_cloud_loadbalancers = Mock()
         pyrax.connect_to_cloud_databases = Mock()
         pyrax._get_service_endpoint = Mock(return_value="http://example.com/")
+        pyrax.USER_AGENT = "DUMMY"
 
     def tearDown(self):
         pyrax.connect_to_cloudservers = self.orig_connect_to_cloudservers
@@ -121,8 +122,8 @@ class PyraxInitTest(unittest.TestCase):
     def test_make_agent_name(self):
         test_agent = "TEST"
         ret = pyrax._make_agent_name(test_agent)
-        self.assert_(ret.startswith(test_agent))
-        self.assert_(ret.endswith(pyrax.USER_AGENT))
+        self.assert_(ret.endswith(test_agent))
+        self.assert_(ret.startswith(pyrax.USER_AGENT))
 
     def test_connect_to_services(self):
         pyrax.connect_to_services()
