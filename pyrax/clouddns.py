@@ -246,7 +246,8 @@ class CloudDNSManager(BaseManager):
         """
         def _fmt_error(err):
             # Remove the cumbersome Java-esque message
-            details = err["details"].split(".")[-1].replace("\n", " ")
+#            details = err["details"].split(".")[-1].replace("\n", " ")
+            details = err["details"].replace("\n", " ")
             if not details:
                 details = err["message"]
             return "%s (%s)" % (details, err["code"])
