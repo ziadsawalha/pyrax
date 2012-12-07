@@ -480,7 +480,7 @@ class CloudDNSManager(BaseManager):
         body = {"records": records}
         resp, ret_body = self._async_call(uri, method="POST", body=body,
                 error_class=exc.DomainRecordAdditionFailed, has_response=False)
-        return resp, ret_body
+        return ret_body
         
 
     def update_record(self, domain, record, name, data=None, priority=None,
@@ -496,7 +496,7 @@ class CloudDNSManager(BaseManager):
         body.update(dict(opts))
         resp, ret_body = self._async_call(uri, method="PUT", body=body,
                 error_class=exc.DomainRecordUpdateFailed, has_response=False)
-        return resp, ret_body
+        return ret_body
 
 
     def delete_record(self, domain, record):
@@ -506,7 +506,7 @@ class CloudDNSManager(BaseManager):
         uri = "/domains/%s/records/%s" % (utils.get_id(domain), utils.get_id(record))
         resp, ret_body = self._async_call(uri, method="DELETE",
                 error_class=exc.DomainRecordDeletionFailed, has_response=False)
-        return resp, ret_body
+        return ret_body
 
 
     def _get_ptr_details(self, device, device_type):
@@ -580,6 +580,7 @@ class CloudDNSManager(BaseManager):
                 }}
         uri = "/rdns"
         resp, ret_body = self.api.method_put(uri, body=body)
+        return ret_body
 
 
     def delete_ptr_records(self, device, device_type="server", ip_address=None):
@@ -592,6 +593,7 @@ class CloudDNSManager(BaseManager):
         if ip_address:
             uri = "%s&ip=%s" % (uri, ip_address)
         resp, ret_body = self.api.method_delete(uri)
+        return ret_body
 
 
 
