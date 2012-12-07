@@ -154,6 +154,9 @@ class CloudDNSDomain(BaseResource):
         """
         self.manager.add_records(self, records)
 
+    #Create an alias, so that adding a single record is more intuitive
+    add_record = add_records
+
 
     def update_record(self, record, name, data=None, priority=None,
             ttl=None, comment=None):
@@ -374,7 +377,7 @@ class CloudDNSManager(BaseManager):
         """
         uri = "/domains/%s/export" % utils.get_id(domain)
         resp, ret_body = self._async_call(uri, method="GET", error_class=exc.NotFound)
-        return ret_body
+        return ret_body.get("contents", "")
 
 
     def import_domain(self, domain_data):
@@ -751,6 +754,9 @@ class CloudDNSClient(BaseClient):
             priority (required for MX and SRV records; forbidden otherwise)
         """
         return domain.add_records(records)
+
+    #Create an alias, so that adding a single record is more intuitive
+    add_record = add_records
 
 
     @assure_domain
