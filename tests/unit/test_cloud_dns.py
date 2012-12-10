@@ -227,7 +227,7 @@ class CloudDNSTest(unittest.TestCase):
         clt = self.client
         dom = self.domain
         export = utils.random_name()
-        clt._manager._async_call = Mock(return_value=({}, export))
+        clt._manager._async_call = Mock(return_value=({}, {"contents": export}))
         ret = clt.export_domain(dom)
         uri = "/domains/%s/export" % dom.id
         clt._manager._async_call.assert_called_once_with(uri, error_class=exc.NotFound, method="GET")
