@@ -118,18 +118,18 @@ class CloudDNSDomain(BaseResource):
                 ttl=ttl, comment=comment)
 
 
-    def list_subdomains(self):
+    def list_subdomains(self, limit=None, offset=None):
         """
         Returns a list of all subdomains for this domain.
         """
-        return self.manager.list_subdomains(self)
+        return self.manager.list_subdomains(self, limit=limit, offset=offset)
 
 
-    def list_records(self):
+    def list_records(self, limit=None, offset=None):
         """
         Returns a list of all records configured for this domain.
         """
-        return self.manager.list_records(self)
+        return self.manager.list_records(self, limit=limit, offset=offset)
 
 
     def search_records(self, record_type, name=None, data=None):
@@ -181,6 +181,98 @@ class CloudDNSManager(BaseManager):
         super(CloudDNSManager, self).__init__(api, resource_class=resource_class,
                 response_key=response_key, plural_response_key=plural_response_key,
                 uri_base=uri_base)
+        self._paging = {"domain": {}, "subdomain": {}, "record": {}, "ptr": {}}
+        self._reset_paging(service="all")
+
+
+    def _reset_paging(self, service, body=None):
+        """
+        Resets the internal attributes when there is no current paging request.
+        """
+        if service == "all":
+            for svc in self._paging.keys():
+                svc_dct = self._paging[svc]
+                svc_dct["next_uri"] = svc_dct["prev_uri"] = svc_dct["total_entries"] = None
+            return
+        svc_dct = self._paging[service]
+        svc_dct["next_uri"] = svc_dct["prev_uri"] = svc_dct["total_entries"] = None
+        if not body:
+            return
+        svc_dct["total_entries"] = body.get("totalEntries")
+        links = body.get("links")
+        uri_base = self.uri_base
+        if links:
+            for link in links:
+                href = link["href"]
+                pos = href.index(uri_base)
+                page_uri = href[pos-1:]
+                if link["rel"] == "next":
+                    svc_dct["next_uri"] = page_uri
+                elif link["rel"] == "previous":
+                    svc_dct["prev_uri"] = page_uri
+
+
+    def _get_pagination_qs(self, limit, offset):
+        pagination_items = []
+        if limit is not None:
+            pagination_items.append("limit=%s" % limit)
+        if offset is not None:
+            pagination_items.append("offset=%s" % offset)
+        qs = "&".join(pagination_items)
+        qs = "?%s" % qs if qs else ""
+        return qs
+
+
+    def list(self, limit=None, offset=None):
+        """Gets a list of all domains, or optionally a page of domains."""
+        uri = "/%s%s" % (self.uri_base, self._get_pagination_qs(limit, offset))
+        return self._list(uri)
+
+
+    def _list(self, uri, obj_class=None, list_all=False):
+        """
+        Handles the communication with the API when getting
+        a full listing of the resources managed by this class.
+        """
+        _resp, resp_body = self.api.method_get(uri)
+        if obj_class is None:
+            obj_class = self.resource_class
+
+        data = resp_body[self.plural_response_key]
+        ret = [obj_class(self, res, loaded=False)
+                for res in data if res]
+        self._reset_paging("domain", resp_body)
+        if list_all:
+            dom_paging = self._paging.get("domain", {})
+            while dom_paging.get("next_uri"):
+                next_uri = dom_paging.get("next_uri")
+                ret.extend(self._list(uri=next_uri, obj_class=obj_class,
+                        list_all=False))
+        return ret
+
+
+    def list_previous_page(self):
+        """
+        When paging through results, this will return the previous page, using the
+        same limit. If there are no more results, a NoMoreResults exception
+        will be raised.
+        """
+        uri = self._paging.get("domain", {}).get("prev_uri")
+        if uri is None:
+            raise exc.NoMoreResults("There are no previous pages of domains to list.")
+        return self._list(uri)
+
+
+    def list_next_page(self):
+        """
+        When paging through results, this will return the next page, using the
+        same limit. If there are no more results, a NoMoreResults exception
+        will be raised.
+        """
+        uri = self._paging.get("domain", {}).get("next_uri")
+        if uri is None:
+            raise exc.NoMoreResults("There are no more pages of domains to list.")
+        return self._list(uri)
 
 
     def _get(self, uri):
@@ -193,9 +285,9 @@ class CloudDNSManager(BaseManager):
         """
         # SLOW!!!!
 #        uri = "%s?showRecords=true&showSubdomains=true" % uri
-        uri = "%s?showRecords=true&showSubdomains=false" % uri
+        uri = "%s?showRecords=false&showSubdomains=false" % uri
         _resp, body = self.api.method_get(uri)
-        body["records"] = body.pop("recordsList").get("records", [])
+        body["records"] = []
         return self.resource_class(self, body, loaded=True)
 
 
@@ -323,7 +415,7 @@ class CloudDNSManager(BaseManager):
             # Filtering on name; use the more efficient method.
             nm = kwargs["name"]
             uri = "/%s?name=%s" % (self.uri_base, nm)
-            matches = self._list(uri)
+            matches = self._list(uri, list_all=True)
             return [match for match in matches
                 if match.name == nm] 
         else:
@@ -419,7 +511,7 @@ class CloudDNSManager(BaseManager):
         return ret_body
 
 
-    def list_subdomains(self, domain):
+    def list_subdomains(self, domain, limit=None, offset=None):
         """
         Returns a list of all subdomains of the specified domain.
         """
@@ -427,22 +519,83 @@ class CloudDNSManager(BaseManager):
         # horribly slow.
 #        uri = "/domains/%s/subdomains" % utils.get_id(domain)
         uri = "/domains?name=%s" % domain.name
+        page_qs = self._get_pagination_qs(limit, offset)
+        if page_qs:
+            uri = "%s&%s" % (uri, page_qs[1:])
+        return self._list_subdomains(uri)
+
+
+    def _list_subdomains(self, uri):
         resp, body = self.api.method_get(uri)
+        self._reset_paging("subdomain", body)
         subdomains = body.get("domains", [])
         return [CloudDNSDomain(self, subdomain, loaded=False)
                 for subdomain in subdomains
                 if subdomain["id"] != domain.id]
 
 
-    def list_records(self, domain):
+    def list_subdomains_previous_page(self):
+        """
+        When paging through subdomain results, this will return the previous page,
+        using the same limit. If there are no more results, a NoMoreResults exception
+        will be raised.
+        """
+        uri = self._paging.get("subdomain", {}).get("prev_uri")
+        if uri is None:
+            raise exc.NoMoreResults("There are no previous pages of subdomains to list.")
+        return self._list_subdomains(uri)
+
+
+    def list_subdomains_next_page(self):
+        """
+        When paging through subdomain results, this will return the next page,
+        using the same limit. If there are no more results, a NoMoreResults exception
+        will be raised.
+        """
+        uri = self._paging.get("subdomain", {}).get("next_uri")
+        if uri is None:
+            raise exc.NoMoreResults("There are no more pages of subdomains to list.")
+        return self._list_subdomains(uri)
+        
+
+    def list_records(self, domain, limit=None, offset=None):
         """
         Returns a list of all records configured for the specified domain.
         """
-        uri = "/domains/%s/records" % utils.get_id(domain)
+        uri = "/domains/%s/records%s" % (utils.get_id(domain), self._get_pagination_qs(limit, offset))
+        return self._list_records(uri)
+
+
+    def _list_records(self, uri):
         resp, body = self.api.method_get(uri)
+        self._reset_paging("record", body)
         records = body.get("records", [])
         return [CloudDNSRecord(self, record, loaded=False)
                 for record in records if record]
+
+
+    def list_records_previous_page(self):
+        """
+        When paging through record results, this will return the previous page,
+        using the same limit. If there are no more results, a NoMoreResults exception
+        will be raised.
+        """
+        uri = self._paging.get("record", {}).get("prev_uri")
+        if uri is None:
+            raise exc.NoMoreResults("There are no previous pages of records to list.")
+        return self._list_records(uri)
+
+
+    def list_records_next_page(self):
+        """
+        When paging through record results, this will return the next page,
+        using the same limit. If there are no more results, a NoMoreResults exception
+        will be raised.
+        """
+        uri = self._paging.get("record", {}).get("next_uri")
+        if uri is None:
+            raise exc.NoMoreResults("There are no more pages of records to list.")
+        return self._list_records(uri)
 
 
     def search_records(self, domain, record_type, name=None, data=None):
@@ -461,6 +614,12 @@ class CloudDNSManager(BaseManager):
             uri = "%s&%s" % (uri, query_string)
         resp, body = self.api.method_get(uri)
         records = body.get("records", [])
+        self._reset_paging("record", body)
+        rec_paging = self._paging.get("record", {})
+        while rec_paging.get("next_uri"):
+            resp, body = self.api.method_get(rec_paging.get("next_uri"))
+            self._reset_paging("record", body)
+            records.extend(body.get("records", []))
         return [CloudDNSRecord(self, record, loaded=False)
                 for record in records if record]
 
@@ -532,11 +691,41 @@ class CloudDNSManager(BaseManager):
     def list_ptr_records(self, device, device_type="server"):
         href, svc_name = self._get_ptr_details(device, device_type)
         uri = "/rdns/%s?href=%s" % (svc_name, href)
+        return self._list_ptr_records(uri)
+
+
+    def _list_ptr_records(self, uri):
+        self._reset_paging("record")
         try:
             resp, ret_body = self.api.method_get(uri)
         except exc.NotFound:
             return []
+        self._reset_paging("record", ret_body)
         return ret_body["records"]
+
+
+    def list_ptr_records_previous_page(self):
+        """
+        When paging through ptr_record results, this will return the previous page,
+        using the same limit. If there are no more results, a NoMoreResults exception
+        will be raised.
+        """
+        uri = self._paging.get("ptr", {}).get("prev_uri")
+        if uri is None:
+            raise exc.NoMoreResults("There are no previous pages of PTR records to list.")
+        return self._list_ptr_records(uri)
+
+
+    def list_ptr_records_next_page(self):
+        """
+        When paging through ptr_record results, this will return the next page,
+        using the same limit. If there are no more results, a NoMoreResults exception
+        will be raised.
+        """
+        uri = self._paging.get("ptr", {}).get("next_uri")
+        if uri is None:
+            raise exc.NoMoreResults("There are no more pages of PTR records to list.")
+        return self._list_ptr_records(uri)
 
 
     def add_ptr_records(self, records, device, device_type="server"):
@@ -638,6 +827,21 @@ class CloudDNSClient(BaseClient):
         return body
 
 
+    def list(self, limit=None, offset=None):
+        """Returns a list of all resources."""
+        return self._manager.list(limit=limit, offset=offset)
+
+
+    def list_previous_page(self):
+        """Returns the previous page of results."""
+        return self._manager.list_previous_page()
+
+
+    def list_next_page(self):
+        """Returns the next page of results."""
+        return self._manager.list_next_page()
+
+
     @assure_domain
     def changes_since(self, domain, date_or_datetime):
         """
@@ -716,19 +920,39 @@ class CloudDNSClient(BaseClient):
 
 
     @assure_domain
-    def list_subdomains(self, domain):
+    def list_subdomains(self, domain, limit=None, offset=None):
         """
         Returns a list of all subdomains for the specified domain.
         """
-        return domain.list_subdomains()
+        return domain.list_subdomains(limit=limit, offset=offset)
+
+
+    def list_subdomains_previous_page(self):
+        """Returns the previous page of subdomain results."""
+        return self._manager.list_subdomains_previous_page()
+
+
+    def list_subdomains_next_page(self):
+        """Returns the next page of subdomain results."""
+        return self._manager.list_subdomains_next_page()
 
 
     @assure_domain
-    def list_records(self, domain):
+    def list_records(self, domain, limit=None, offset=None):
         """
         Returns a list of all records configured for the specified domain.
         """
-        return domain.list_records()
+        return domain.list_records(limit=limit, offset=offset)
+
+
+    def list_records_previous_page(self):
+        """Returns the previous page of record results."""
+        return self._manager.list_records_previous_page()
+
+
+    def list_records_next_page(self):
+        """Returns the next page of record results."""
+        return self._manager.list_records_next_page()
 
 
     @assure_domain
@@ -776,6 +1000,16 @@ class CloudDNSClient(BaseClient):
 
     def list_ptr_records(self, device, device_type="server"):
         return self._manager.list_ptr_records(device, device_type=device_type)
+
+
+    def list_ptr_records_previous_page(self):
+        """Returns the previous page of PTR record results."""
+        return self._manager.list_ptr_records_previous_page()
+
+
+    def list_ptr_records_next_page(self):
+        """Returns the next page of PTR record results."""
+        return self._manager.list_ptr_records_next_page()
 
 
     def add_ptr_records(self, records, device, device_type="server"):

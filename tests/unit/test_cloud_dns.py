@@ -4,6 +4,7 @@
 import random
 import unittest
 
+from mock import call
 from mock import patch
 from mock import MagicMock as Mock
 
@@ -49,6 +50,180 @@ class CloudDNSTest(unittest.TestCase):
         self.assertTrue(isinstance(d1, CloudDNSDomain))
         self.assertTrue(isinstance(d2, CloudDNSDomain))
 
+    def test_reset_paging_all(self):
+        clt = self.client
+        mgr = clt._manager
+        mgr._paging["domain"]["total_entries"] = 99
+        mgr._paging["record"]["next_uri"] = example_uri
+        mgr._reset_paging("all")
+        self.assertIsNone(mgr._paging["domain"]["total_entries"])
+        self.assertIsNone(mgr._paging["record"]["next_uri"])
+
+    def test_reset_paging_body(self):
+        clt = self.client
+        mgr = clt._manager
+        mgr._paging["domain"]["total_entries"] = 99
+        mgr._paging["domain"]["next_uri"] = "FAKE"
+        exp_entries = random.randint(100, 200)
+        uri_string_next = utils.random_name()
+        next_uri = "%s/domains/%s" % (example_uri, uri_string_next)
+        uri_string_prev = utils.random_name()
+        prev_uri = "%s/domains/%s" % (example_uri, uri_string_prev)
+        body = {"totalEntries": exp_entries,
+                "links": [
+                    {"href": next_uri,
+                    "rel": "next"},
+                    {"href": prev_uri,
+                    "rel": "previous"}]}
+        mgr._reset_paging("domain", body=body)
+        self.assertEqual(mgr._paging["domain"]["total_entries"], exp_entries)
+        self.assertEqual(mgr._paging["domain"]["next_uri"], "/domains/%s" % uri_string_next)
+        self.assertEqual(mgr._paging["domain"]["prev_uri"], "/domains/%s" % uri_string_prev)
+
+    def test_get_pagination_qs(self):
+        clt = self.client
+        mgr = clt._manager
+        test_limit = random.randint(1, 100)
+        test_offset = random.randint(1, 100)
+        qs = mgr._get_pagination_qs(test_limit, test_offset)
+        self.assertEqual(qs, "?limit=%s&offset=%s" % (test_limit, test_offset))
+
+    def test_manager_list(self):
+        clt = self.client
+        mgr = clt._manager
+        fake_name = utils.random_name()
+        ret_body = {"domains": [{"name": fake_name}]}
+        clt.method_get = Mock(return_value=({}, ret_body))
+        ret = clt.list()
+        self.assertEqual(len(ret), 1)
+
+    def test_manager_list_all(self):
+        clt = self.client
+        mgr = clt._manager
+        fake_name = utils.random_name()
+        ret_body = {"domains": [{"name": fake_name}]}
+        uri_string_next = utils.random_name()
+        next_uri = "%s/domains/%s" % (example_uri, uri_string_next)
+        mgr.count = 0
+        def mock_get(uri):
+            if mgr.count:
+                return ({}, ret_body)
+            mgr.count += 1
+            ret = {"totalEntries": 2,
+                    "links": [
+                        {"href": next_uri,
+                         "rel": "next"}]}
+            ret.update(ret_body)
+            return ({}, ret)
+
+        clt.method_get = Mock(wraps=mock_get)
+        ret = mgr._list(example_uri, list_all=True)
+        self.assertEqual(len(ret), 2)
+
+    def test_list_previous_page(self):
+        clt = self.client
+        mgr = clt._manager
+        mgr._paging["domain"]["prev_uri"] = example_uri
+        mgr._list = Mock()
+        clt.list_previous_page()
+        mgr._list.assert_called_once_with(example_uri)
+
+    def test_list_previous_page_fail(self):
+        clt = self.client
+        mgr = clt._manager
+        self.assertRaises(exc.NoMoreResults, clt.list_previous_page)
+
+    def test_list_next_page(self):
+        clt = self.client
+        mgr = clt._manager
+        mgr._paging["domain"]["next_uri"] = example_uri
+        mgr._list = Mock()
+        clt.list_next_page()
+        mgr._list.assert_called_once_with(example_uri)
+
+    def test_list_next_page_fail(self):
+        clt = self.client
+        mgr = clt._manager
+        self.assertRaises(exc.NoMoreResults, clt.list_next_page)
+
+    def test_list_subdomains_previous_page(self):
+        clt = self.client
+        mgr = clt._manager
+        mgr._paging["subdomain"]["prev_uri"] = example_uri
+        mgr._list_subdomains = Mock()
+        clt.list_subdomains_previous_page()
+        mgr._list_subdomains.assert_called_once_with(example_uri)
+
+    def test_list_subdomains_previous_page_fail(self):
+        clt = self.client
+        mgr = clt._manager
+        self.assertRaises(exc.NoMoreResults, clt.list_subdomains_previous_page)
+
+    def test_list_subdomains_next_page(self):
+        clt = self.client
+        mgr = clt._manager
+        mgr._paging["subdomain"]["next_uri"] = example_uri
+        mgr._list_subdomains = Mock()
+        clt.list_subdomains_next_page()
+        mgr._list_subdomains.assert_called_once_with(example_uri)
+
+    def test_list_subdomains_next_page_fail(self):
+        clt = self.client
+        mgr = clt._manager
+        self.assertRaises(exc.NoMoreResults, clt.list_subdomains_next_page)
+
+    def test_list_records_previous_page(self):
+        clt = self.client
+        mgr = clt._manager
+        mgr._paging["record"]["prev_uri"] = example_uri
+        mgr._list_records = Mock()
+        clt.list_records_previous_page()
+        mgr._list_records.assert_called_once_with(example_uri)
+
+    def test_list_records_previous_page_fail(self):
+        clt = self.client
+        mgr = clt._manager
+        self.assertRaises(exc.NoMoreResults, clt.list_records_previous_page)
+
+    def test_list_records_next_page(self):
+        clt = self.client
+        mgr = clt._manager
+        mgr._paging["record"]["next_uri"] = example_uri
+        mgr._list_records = Mock()
+        clt.list_records_next_page()
+        mgr._list_records.assert_called_once_with(example_uri)
+
+    def test_list_records_next_page_fail(self):
+        clt = self.client
+        mgr = clt._manager
+        self.assertRaises(exc.NoMoreResults, clt.list_records_next_page)
+
+    def test_list_ptr_records_previous_page(self):
+        clt = self.client
+        mgr = clt._manager
+        mgr._paging["ptr"]["prev_uri"] = example_uri
+        mgr._list_ptr_records = Mock()
+        clt.list_ptr_records_previous_page()
+        mgr._list_ptr_records.assert_called_once_with(example_uri)
+
+    def test_list_ptr_records_previous_page_fail(self):
+        clt = self.client
+        mgr = clt._manager
+        self.assertRaises(exc.NoMoreResults, clt.list_ptr_records_previous_page)
+
+    def test_list_ptr_records_next_page(self):
+        clt = self.client
+        mgr = clt._manager
+        mgr._paging["ptr"]["next_uri"] = example_uri
+        mgr._list_ptr_records = Mock()
+        clt.list_ptr_records_next_page()
+        mgr._list_ptr_records.assert_called_once_with(example_uri)
+
+    def test_list_ptr_records_next_page_fail(self):
+        clt = self.client
+        mgr = clt._manager
+        self.assertRaises(exc.NoMoreResults, clt.list_ptr_records_next_page)
+
     def test_manager_get(self):
         ret_body = {"recordsList": {
                 "records": [{
@@ -63,7 +238,6 @@ class CloudDNSTest(unittest.TestCase):
         mgr.api.method_get = Mock(return_value=(None, ret_body))
         dom = mgr._get("fake")
         self.assertTrue(isinstance(dom, CloudDNSDomain))
-
 
     def test_manager_create(self):
         clt = self.client
@@ -102,7 +276,7 @@ class CloudDNSTest(unittest.TestCase):
         mgr = clt._manager
         mgr._list = Mock()
         mgr.findall(name="fake")
-        mgr._list.assert_called_once_with("/domains?name=fake")
+        mgr._list.assert_called_once_with("/domains?name=fake", list_all=True)
 
     def test_manager_findall_default(self):
         clt = self.client
@@ -293,8 +467,8 @@ class CloudDNSTest(unittest.TestCase):
         dom = self.domain
         clt.method_get = Mock(return_value=({}, {}))
 #        uri = "/domains/%s/subdomains" % utils.get_id(dom)
-        uri = "/domains?name=%s" % dom.name
-        clt.list_subdomains(dom)
+        uri = "/domains?name=%s&limit=5" % dom.name
+        clt.list_subdomains(dom, limit=5)
         clt.method_get.assert_called_once_with(uri)
 
     def test_list_records(self):
@@ -311,10 +485,24 @@ class CloudDNSTest(unittest.TestCase):
         mgr = clt._manager
         dom = self.domain
         typ = "A"
-        clt.method_get = Mock(return_value=({}, {}))
         uri = "/domains/%s/records?type=%s" % (utils.get_id(dom), typ)
+        ret_body = {"records": [{"type": typ}]}
+        mgr.count = 0
+        def mock_get(uri):
+            if mgr.count:
+                return ({}, ret_body)
+            mgr.count += 1
+            ret = {"totalEntries": 2,
+                    "links": [
+                        {"href": uri,
+                         "rel": "next"}]}
+            ret.update(ret_body)
+            return ({}, ret)
+
+        clt.method_get = Mock(wraps=mock_get)
         clt.search_records(dom, typ)
-        clt.method_get.assert_called_once_with(uri)
+        calls = [call(uri), call(uri)]
+        clt.method_get.assert_has_calls(calls)
 
     def test_search_records_params(self):
         clt = self.client

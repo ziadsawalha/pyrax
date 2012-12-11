@@ -110,6 +110,9 @@ class MissingHealthMonitorSettings(PyraxException):
 class MissingName(PyraxException):
     pass
 
+class NoMoreResults(PyraxException):
+    pass
+
 class NoReloadError(PyraxException):
     pass
 

@@ -206,6 +206,8 @@ class FakeDNSManager(CloudDNSManager):
             api = FakeDNSClient()
         super(FakeDNSManager, self).__init__(api, *args, **kwargs)
         self.resource_class = FakeDNSDomain
+        self.response_key = "domain"
+        self.plural_response_key = "domains"
         self.uri_base = "domains"
 
 

@@ -31,6 +31,8 @@ To get a list of all the domains that are manageable by your account, call the `
 
 This will return a list of `CloudDNSDomain` objects, with which you can then interact. It is a flat list: there is no hierarchical nesting of subdomains within their parent domains. Assuming that you have just started, you will get back an empty list. The next step would be to add your domains.
 
+You could have hundreds of domains, and by default this method will only return the first hundred domains. 
+
 
 ## Adding Domains
 To create a domain, you would call the `dns.create()` method, supplying some or all of the following parameters:
@@ -179,6 +181,9 @@ Both will create the same output:
 
     example.edu.        3600    IN    SOA    ns.rackspace.com. sample.rackspace.edu. 1354918038 21600 3600 1814400 500    example.edu.        6000    IN    A    192.168.0.42    example.edu.        3600    IN    NS    dns1.stabletransit.com.    example.edu.        3600    IN    NS    dns2.stabletransit.com.    example.edu.        3600    IN    MX    50 mail.example.edu.
 
+
+
+## PTR Records
 
 
 
