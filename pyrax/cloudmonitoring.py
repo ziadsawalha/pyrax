@@ -30,6 +30,15 @@ import pyrax.utils as utils
 _invalid_key_pat = re.compile(r"Validation error for key '([^']+)'")
 
 
+def _params_to_dict(params, dct, local_dict):
+    for param in params:
+        val = local_dict.get(param)
+        if val is None:
+            continue
+        dct[param] = val
+    return dct
+
+
 
 class CloudMonitorEntity(BaseResource):
     def update(self, agent=None, metadata=None):
@@ -51,6 +60,44 @@ class CloudMonitorEntity(BaseResource):
         Deletes the specified check from this entity.
         """
         return self.manager.delete_check(self, check)
+
+
+    def list_metrics(self, check):
+        """
+        Returns a list of all the metrics associated with the specified check.
+        """
+        return self.manager.list_metrics(self, check)
+
+
+    def get_metric_data_points(self, check, metric, start, end, points=None,
+            resolution=None, stats=None):
+        """
+        Returns the data points for a given metric for the given period. The
+        'start' and 'end' times must be specified; they can be be either Python
+        date/datetime values, or a Unix timestamp.
+
+        The 'points' parameter represents the number of points to return. The
+        'resolution' parameter represents the granularity of the data. You must
+        specify either 'points' or 'resolution'. The allowed values for
+        resolution are:
+            FULL
+            MIN5
+            MIN20
+            MIN60
+            MIN240
+            MIN1440
+
+        Finally, the 'stats' parameter specifies the stats you want returned.
+        By default only the 'average' is returned. You omit this parameter,
+        pass in a single value, or pass in a list of values. The allowed values
+        are:
+            average
+            variance
+            min
+            max
+        """
+        return self.manager.get_metric_data_points(self, check, start, end,
+                points=points, resolution=resolution, stats=stats)
 
 
     @property
@@ -133,13 +180,9 @@ class CloudMonitorEntityManager(BaseManager):
             body["type"] = check_type.id
         else:
             body["type"] = check_type
-        local_dict = locals()
-        for param in ("metadata", "monitoring_zones_poll", "timeout", "period",
-                "target_alias", "target_hostname", "target_receiver"):
-            val = local_dict.get(param)
-            if val is None:
-                continue
-            body[param] = val
+        params = ("monitoring_zones_poll", "timeout", "period",
+                "target_alias", "target_hostname", "target_receiver")
+        body = _params_to_dict(params, body, locals())
         if test_only:
             uri = "/%s/%s/test-check" % (self.uri_base, entity.id)
             if include_debug:
@@ -205,13 +248,10 @@ class CloudMonitorEntityManager(BaseManager):
         body = {}
         local_dict = locals()
         label = label or name
-        for param in ("label", "disabled", "metadata", "monitoring_zones_poll",
+        params = ("label", "disabled", "metadata", "monitoring_zones_poll",
                 "timeout", "period", "target_alias", "target_hostname",
-                "target_receiver"):
-            val = local_dict.get(param)
-            if val is None:
-                continue
-            body[param] = val
+                "target_receiver")
+        body = _params_to_dict(params, body, locals())
         entity = check.entity
         uri = "/%s/%s/checks/%s" % (self.uri_base, utils.get_id(entity),
                 utils.get_id(check))
@@ -250,6 +290,86 @@ class CloudMonitorEntityManager(BaseManager):
         resp, resp_body = self.api.method_delete(uri)
 
 
+    def list_metrics(self, entity, check):
+        """
+        Returns a list of all the metrics associated with the specified check.
+        """
+        uri = "/%s/%s/checks/%s/metrics" % (self.uri_base,
+                utils.get_id(entity), utils.get_id(check))
+        resp, resp_body = self.api.method_get(uri)
+        metrics = [val["name"]
+                for val in resp_body["values"]]
+        return metrics
+
+
+    def get_metric_data_points(self, entity, check, metric, start, end,
+            points=None, resolution=None, stats=None):
+        """
+        Returns the data points for a given metric for the given period. The
+        'start' and 'end' times must be specified; they can be be either Python
+        date/datetime values, a string representing a date/datetime in either
+        of 'YYYY-MM-DD HH:MM:SS' or 'YYYY-MM-DD' formats, or a Unix timestamp:
+
+        The 'points' parameter represents the number of points to return. The
+        'resolution' parameter represents the granularity of the data. You must
+        specify either 'points' or 'resolution'. The allowed values for
+        resolution are:
+            FULL
+            MIN5
+            MIN20
+            MIN60
+            MIN240
+            MIN1440
+
+        Finally, the 'stats' parameter specifies the stats you want returned.
+        By default only the 'average' is returned. You omit this parameter,
+        pass in a single value, or pass in a list of values. The allowed values
+        are:
+            average
+            variance
+            min
+            max
+        """
+        allowed_resolutions = ("FULL", "MIN5", "MIN20", "MIN60", "MIN240",
+                "MIN1440")
+        if not (points or resolution):
+            raise exc.MissingMonitoringCheckGranularity("You must specify "
+                    "either the 'points' or 'resolution' parameter when "
+                    "fetching metrics.")
+        if resolution:
+            if resolution.upper() not in allowed_resolutions:
+                raise exc.InvalidMonitorMetricResolution("The specified "
+                        "resolution '%s' is not valid. The valid values are: "
+                        "%s." % (resolution, str(allowed_resolutions)))
+        start_tm = utils.to_timestamp(start)
+        end_tm = utils.to_timestamp(end)
+        qparms = []
+        qparms.append("from=%s" % int(start_tm))
+        qparms.append("to=%s" % int(end_tm))
+        if points:
+            qparms.append("points=%s" % points)
+        if resolution:
+            qparms.append("resolution=%s" % resolution.upper())
+        if stats:
+            stats = utils.coerce_string_to_list(stats)
+            for stat in stats:
+                qparms.append("select=%s" % stat)
+        qparm = "&".join(qparms)
+        uri = "/%s/%s/checks/%s/metrics/%s/plot?%s" % (self.uri_base,
+                utils.get_id(entity), utils.get_id(check), metric, qparm)
+        print uri
+        try:
+            resp, resp_body = self.api.method_get(uri)
+        except exc.BadRequest as e:
+            print "ERR MSG", e.message
+            print "ERR DET", e.details
+            raise
+        print "RESP"
+        print resp
+        print "BODY"
+        print resp_body
+
+
 
 class CloudMonitorCheck(BaseResource):
     """
@@ -269,17 +389,11 @@ class CloudMonitorCheck(BaseResource):
     reload = get
 
 
-    def delete(self):
-        """Removes this check from its entity."""
-        self.manager.delete_check(self)
-
-
-    def update(self, label=None, name=None, 
-            disabled=None, metadata=None,
+    def update(self, label=None, name=None, disabled=None, metadata=None,
             monitoring_zones_poll=None, timeout=None, period=None,
             target_alias=None, target_hostname=None, target_receiver=None):
         """
-        Updates an existing check
+        Updates an existing check with any of the parameters.
         """
         self.manager.update_check(self, label=label, name=name,
                 disabled=disabled, metadata=metadata,
@@ -287,6 +401,49 @@ class CloudMonitorCheck(BaseResource):
                 period=period, target_alias=target_alias,
                 target_hostname=target_hostname,
                 target_receiver=target_receiver)
+
+
+    def delete(self):
+        """Removes this check from its entity."""
+        self.manager.delete_check(self.entity, self)
+
+
+    def list_metrics(self):
+        """
+        Returns a list of all the metrics associated with this check.
+        """
+        return self.manager.list_metrics(self.entity, self)
+
+
+    def get_metric_data_points(self, metric, start, end, points=None,
+            resolution=None, stats=None):
+        """
+        Returns the data points for a given metric for the given period. The
+        'start' and 'end' times must be specified; they can be be either Python
+        date/datetime values, or a Unix timestamp.
+
+        The 'points' parameter represents the number of points to return. The
+        'resolution' parameter represents the granularity of the data. You must
+        specify either 'points' or 'resolution'. The allowed values for
+        resolution are:
+            FULL
+            MIN5
+            MIN20
+            MIN60
+            MIN240
+            MIN1440
+
+        Finally, the 'stats' parameter specifies the stats you want returned.
+        By default only the 'average' is returned. You omit this parameter,
+        pass in a single value, or pass in a list of values. The allowed values
+        are:
+            average
+            variance
+            min
+            max
+        """
+        return self.manager.get_metric_data_points(self.entity, self, metric,
+                start, end, points=points, resolution=resolution, stats=stats)
 
 
 
@@ -434,7 +591,9 @@ class CloudMonitoringClient(BaseClient):
             metadata=None, monitoring_zones_poll=None, timeout=None,
             period=None, target_alias=None, target_hostname=None,
             target_receiver=None):
-        """Updates an existing check."""
+        """
+        Updates an existing check with any of the parameters.
+        """
         self._entity_manager.update_check(self, label=label, name=name,
                 disabled=disabled, metadata=metadata,
                 monitoring_zones_poll=monitoring_zones_poll, timeout=timeout,
@@ -448,6 +607,44 @@ class CloudMonitoringClient(BaseClient):
         Deletes the specified check from the entity.
         """
         return self._entity_manager.delete_check(entity, check)
+
+
+    def list_metrics(self, entity, check):
+        """
+        Returns a list of all the metrics associated with the specified check.
+        """
+        return self._entity_manager.list_metrics(entity, check)
+
+
+    def get_metric_data_points(self, entity, check, metric, start, end,
+            points=None, resolution=None, stats=None):
+        """
+        Returns the data points for a given metric for the given period. The
+        'start' and 'end' times must be specified; they can be be either Python
+        date/datetime values, or a Unix timestamp.
+
+        The 'points' parameter represents the number of points to return. The
+        'resolution' parameter represents the granularity of the data. You must
+        specify either 'points' or 'resolution'. The allowed values for
+        resolution are:
+            FULL
+            MIN5
+            MIN20
+            MIN60
+            MIN240
+            MIN1440
+
+        Finally, the 'stats' parameter specifies the stats you want returned.
+        By default only the 'average' is returned. You omit this parameter,
+        pass in a single value, or pass in a list of values. The allowed values
+        are:
+            average
+            variance
+            min
+            max
+        """
+        return self._entity_manager.get_metric_data_points(entity, check,
+                start, end, points=points, resolution=resolution, stats=stats)
 
 
     def list_monitoring_zones(self):

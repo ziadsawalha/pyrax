@@ -329,6 +329,26 @@ def _wait_until(obj, att, desired, callback, interval, attempts, verbose,
     return obj
 
 
+def _parse_datetime_string(val):
+    """
+    Attempts to parse a string representation of a date or datetime value, and
+    returns a datetime if successful. If not, a InvalidDateTimeString exception
+    will be raised.
+    """
+    dt = None
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+        try:
+            dt = datetime.datetime.strptime(val, fmt)
+            break
+        except ValueError:
+            continue
+    if dt is None:
+        raise exc.InvalidDateTimeString("The supplied value '%s' does not "
+          "match either of the formats 'YYYY-MM-DD HH:MM:SS' or "
+          "'YYYY-MM-DD'." % val)
+    return dt
+
+
 def iso_time_string(val, show_tzinfo=False):
     """
     Takes either a date, datetime or a string, and returns the standard ISO
@@ -338,17 +358,7 @@ def iso_time_string(val, show_tzinfo=False):
     if not val:
         return ""
     if isinstance(val, basestring):
-        dt = None
-        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
-            try:
-                dt = datetime.datetime.strptime(val, fmt)
-                break
-            except ValueError:
-                continue
-        if dt is None:
-            raise exc.InvalidDateTimeString("The supplied value '%s' does not "
-              "match either of the formats 'YYYY-MM-DD HH:MM:SS' or "
-              "'YYYY-MM-DD'." % val)
+        dt = _parse_datetime_string(val)
     else:
         dt = val
     if not isinstance(dt, datetime.datetime):
@@ -364,6 +374,19 @@ def iso_time_string(val, show_tzinfo=False):
     elif not show_tzinfo and not has_tz:
         ret = dt.isoformat().split(".")[0]
     return ret
+
+
+def to_timestamp(val):
+    """
+    Takes a value that is either a Python date, datetime, or a string
+    representation of a date/datetime value. Returns a standard Unix timestamp
+    corresponding to that value.
+    """
+    if isinstance(val, basestring):
+        dt = _parse_datetime_string(val)
+    else:
+        dt = val
+    return time.mktime(dt.timetuple())
 
 
 def get_id(id_or_obj):

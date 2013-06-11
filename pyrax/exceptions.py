@@ -122,6 +122,9 @@ class InvalidMonitoringCheckDetails(PyraxException):
 class InvalidMonitoringCheckUpdate(PyraxException):
     pass
 
+class InvalidMonitorMetricResolution(PyraxException):
+    pass
+
 class InvalidNodeCondition(PyraxException):
     pass
 
@@ -168,6 +171,9 @@ class MissingLoadBalancerParameters(PyraxException):
     pass
 
 class MissingMonitoringCheckDetails(PyraxException):
+    pass
+
+class MissingMonitoringCheckGranularity(PyraxException):
     pass
 
 class MissingName(PyraxException):
