@@ -338,7 +338,7 @@ class CloudMonitorEntityManager(BaseManager):
                     "fetching metrics.")
         if resolution:
             if resolution.upper() not in allowed_resolutions:
-                raise exc.InvalidMonitorMetricResolution("The specified "
+                raise exc.InvalidMonitoringMetricsResolution("The specified "
                         "resolution '%s' is not valid. The valid values are: "
                         "%s." % (resolution, str(allowed_resolutions)))
         start_tm = utils.to_timestamp(start)
@@ -357,17 +357,17 @@ class CloudMonitorEntityManager(BaseManager):
         qparm = "&".join(qparms)
         uri = "/%s/%s/checks/%s/metrics/%s/plot?%s" % (self.uri_base,
                 utils.get_id(entity), utils.get_id(check), metric, qparm)
-        print uri
         try:
             resp, resp_body = self.api.method_get(uri)
         except exc.BadRequest as e:
-            print "ERR MSG", e.message
-            print "ERR DET", e.details
-            raise
-        print "RESP"
-        print resp
-        print "BODY"
-        print resp_body
+            msg = e.message
+            dtls = e.details
+            if msg.startswith("Validation error"):
+                raise exc.InvalidMonitoringMetricsRequest("Your request was "
+                        "invalid: '%s'" % dtls)
+            else:
+                raise
+        return resp_body["values"]
 
 
 

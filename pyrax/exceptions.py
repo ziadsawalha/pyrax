@@ -122,7 +122,10 @@ class InvalidMonitoringCheckDetails(PyraxException):
 class InvalidMonitoringCheckUpdate(PyraxException):
     pass
 
-class InvalidMonitorMetricResolution(PyraxException):
+class InvalidMonitoringMetricsRequest(PyraxException):
+    pass
+
+class InvalidMonitoringMetricsResolution(PyraxException):
     pass
 
 class InvalidNodeCondition(PyraxException):
