@@ -100,9 +100,56 @@ class CloudMonitorEntity(BaseResource):
                 points=points, resolution=resolution, stats=stats)
 
 
+    def create_alarm(self, check, notification, criteria=None, disabled=False,
+            label=None, name=None, metadata=None):
+        """
+        Creates an alarm that binds the check on this entity with a
+        notification plan.
+        """
+        return self.manager.create_alarm(self, check, notification,
+                criteria=criteria, disabled=disabled, label=label, name=name,
+                metadata=metadata)
+
+
     @property
     def name(self):
         return self.label
+
+
+
+class CloudMonitorNotificationManager(BaseManager):
+    """
+    Handles all of the requests dealing with notifications.
+    """
+    def create(self, notification_type, label=None, name=None, details=None):
+        """
+        Defines a notification for handling an alarm.
+        """
+        label = label or name
+        print "CREATE NOTIFICATION"
+
+
+
+class CloudMonitorNotificationTypeManager(BaseManager):
+    """
+    Handles all of the requests dealing with notification types.
+    """
+    pass
+
+
+
+class CloudMonitorNotificationPlanManager(BaseManager):
+    """
+    Handles all of the requests dealing with Notification Plans.
+    """
+    def create(self, label=None, name=None, critical_state=None, ok_state=None,
+            warning_state=None):
+        """
+        Creates a notification plan to be executed when a monitoring check
+        triggers an alarm.
+        """
+        label = label or name
+        print "CREATE NOTIFICATION PLAN"
 
 
 
@@ -234,8 +281,8 @@ class CloudMonitorEntityManager(BaseManager):
             except AttributeError:
                 continue
         return found
-        
-        
+
+
     def update_check(self, check, label=None, name=None, disabled=None,
             metadata=None, monitoring_zones_poll=None, timeout=None,
             period=None, target_alias=None, target_hostname=None,
@@ -370,6 +417,15 @@ class CloudMonitorEntityManager(BaseManager):
         return resp_body["values"]
 
 
+    def create_alarm(self, entity, check, notification, criteria=None,
+            disabled=False, label=None, name=None, metadata=None):
+        """
+        Creates an alarm that binds the check on the given entity with a
+        notification plan.
+        """
+        pass
+
+
 
 class CloudMonitorCheck(BaseResource):
     """
@@ -446,10 +502,20 @@ class CloudMonitorCheck(BaseResource):
                 start, end, points=points, resolution=resolution, stats=stats)
 
 
+    def create_alarm(self, notification, criteria=None, disabled=False,
+            label=None, name=None, metadata=None):
+        """
+        Creates an alarm that binds this check with a notification plan.
+        """
+        return self.manager.create_alarm(self.entity, self, notification,
+                criteria=criteria, disabled=disabled, label=label, name=name,
+                metadata=metadata)
+
+
 
 class CloudMonitorCheckType(BaseResource):
     """
-    Represents the type of monitor check to be run. Each check type 
+    Represents the type of monitor check to be run. Each check type
     """
     @property
     def field_names(self):
@@ -478,8 +544,7 @@ class CloudMonitorCheckType(BaseResource):
 
 
 
-
-class CloudMonitoringZone(BaseResource):
+class CloudMonitorZone(BaseResource):
     """
     Represents a location from which Cloud Monitoring collects data.
     """
@@ -489,13 +554,44 @@ class CloudMonitoringZone(BaseResource):
 
 
 
-class CloudMonitoringClient(BaseClient):
+class CloudMonitorNotification(BaseResource):
+    """
+    Represents an action to take when an alarm is triggered.
+    """
+    @property
+    def name(self):
+        return self.label
+
+
+
+class CloudMonitorNotificationType(BaseResource):
+    """
+    Represents a class of action to take when an alarm is triggered.
+    """
+    @property
+    def name(self):
+        return self.label
+
+
+
+class CloudMonitorNotificationPlan(BaseResource):
+    """
+    A Notification plan ties together alarms triggered by entity checks with
+    actions to notify the administrator.
+    """
+    @property
+    def name(self):
+        return self.label
+
+
+
+class CloudMonitorClient(BaseClient):
     """
     This is the base client for creating and managing Cloud Monitoring.
     """
 
     def __init__(self, *args, **kwargs):
-        super(CloudMonitoringClient, self).__init__(*args, **kwargs)
+        super(CloudMonitorClient, self).__init__(*args, **kwargs)
         self.name = "Cloud Monitoring"
 
 
@@ -510,7 +606,19 @@ class CloudMonitoringClient(BaseClient):
                 uri_base="check_types", resource_class=CloudMonitorCheckType,
                 response_key=None, plural_response_key=None)
         self._monitoring_zone_manager = BaseManager(self,
-                uri_base="monitoring_zones", resource_class=CloudMonitoringZone,
+                uri_base="monitoring_zones", resource_class=CloudMonitorZone,
+                response_key=None, plural_response_key=None)
+        self._notification_manager = CloudMonitorNotificationManager(self,
+                uri_base="notifications",
+                resource_class=CloudMonitorNotification,
+                response_key=None, plural_response_key=None)
+        self._notification_type_manager = CloudMonitorNotificationTypeManager(
+                self, uri_base="notification_types",
+                resource_class=CloudMonitorNotificationType,
+                response_key=None, plural_response_key=None)
+        self._notification_plan_manager = CloudMonitorNotificationPlanManager(
+                self, uri_base="notification_plans",
+                resource_class=CloudMonitorNotificationPlan,
                 response_key=None, plural_response_key=None)
 
 
@@ -647,6 +755,45 @@ class CloudMonitoringClient(BaseClient):
                 start, end, points=points, resolution=resolution, stats=stats)
 
 
+    def create_notification(self, notification_type, label=None, name=None,
+            details=None):
+        """
+        Defines a notification for handling an alarm.
+        """
+        return self._notification_manager.create(notification_type,
+                label=label, name=name, details=details)
+
+
+    def create_notification_plan(self, label=None, name=None,
+            critical_state=None, ok_state=None, warning_state=None):
+        """
+        Creates a notification plan to be executed when a monitoring check
+        triggers an alarm.
+        """
+        return self._notification_plan_manager.create(label=label, name=name,
+                critical_state=critical_state, ok_state=ok_state,
+                warning_state=warning_state)
+
+
+    def create_alarm(self, entity, check, notification, criteria=None,
+            disabled=False, label=None, name=None, metadata=None):
+        """
+        Creates an alarm that binds the check on the given entity with a
+        notification plan.
+        """
+        return self._entity_manager.create_alarm(entity, check, notification,
+                criteria=criteria, disabled=disabled, label=label, name=name,
+                metadata=metadata)
+
+
+    def list_notification_types(self):
+        return self._notification_type_manager.list()
+
+
+    def get_notification_type(self, nt_id):
+        return self._notification_type_manager.get(nt_id)
+
+
     def list_monitoring_zones(self):
         """
         Returns a list of all available monitoring zones.
@@ -659,6 +806,7 @@ class CloudMonitoringClient(BaseClient):
         Returns the monitoring zone for the given ID.
         """
         return self._monitoring_zone_manager.get(mz_id)
+
 
     #################################################################
     # The following methods are defined in the generic client class,

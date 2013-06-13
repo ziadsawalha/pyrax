@@ -74,7 +74,7 @@ try:
     from cloudblockstorage import CloudBlockStorageClient
     from clouddns import CloudDNSClient
     from cloudnetworks import CloudNetworkClient
-    from cloudmonitoring import CloudMonitoringClient
+    from cloudmonitoring import CloudMonitorClient
 except ImportError:
     # See if this is the result of the importing of version.py in setup.py
     callstack = inspect.stack()
@@ -372,6 +372,21 @@ def _require_auth(fnc):
 def _safe_region(region=None):
     """Value to use when no region is specified."""
     return region or settings.get("region") or default_region
+
+
+
+
+
+
+@_assure_identity
+def auth_with_token(token, tenant_id=None, tenant_name=None, region=None):
+    identity.auth_with_token(token, tenant_id=tenant_id,
+            tenant_name=tenant_name)
+    connect_to_services(region=region)
+
+
+
+
 
 
 @_assure_identity
@@ -678,7 +693,7 @@ def connect_to_cloud_monitoring(region=None):
     """Creates a client for working with cloud monitoring."""
     region = _safe_region(region)
     ep = _get_service_endpoint("monitor", region)
-    cloud_monitoring = CloudMonitoringClient(region_name=region,
+    cloud_monitoring = CloudMonitorClient(region_name=region,
             management_url=ep, http_log_debug=_http_debug,
             service_type="rax:monitor")
     cloud_monitoring.user_agent = _make_agent_name(cloud_monitoring.user_agent)
