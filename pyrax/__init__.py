@@ -94,6 +94,7 @@ cloud_databases = None
 cloud_blockstorage = None
 cloud_dns = None
 cloud_networks = None
+cloud_monitoring = None
 # Default region for all services. Can be individually overridden if needed
 default_region = "DFW"
 # Encoding to use when working with non-ASCII names
@@ -510,7 +511,7 @@ def clear_credentials():
     """De-authenticate by clearing all the names back to None."""
     global identity, regions, services, cloudservers, cloudfiles
     global cloud_loadbalancers, cloud_databases, cloud_blockstorage, cloud_dns
-    global cloud_networks
+    global cloud_networks, cloud_monitoring
     identity = None
     regions = tuple()
     services = tuple()
@@ -521,6 +522,7 @@ def clear_credentials():
     cloud_blockstorage = None
     cloud_dns = None
     cloud_networks = None
+    cloud_monitoring = None
 
 
 def _make_agent_name(base):
@@ -537,7 +539,7 @@ def _make_agent_name(base):
 def connect_to_services(region=None):
     """Establishes authenticated connections to the various cloud APIs."""
     global cloudservers, cloudfiles, cloud_loadbalancers, cloud_databases
-    global cloud_blockstorage, cloud_dns, cloud_networks
+    global cloud_blockstorage, cloud_dns, cloud_networks, cloud_monitoring
     cloudservers = connect_to_cloudservers(region=region)
     cloudfiles = connect_to_cloudfiles(region=region)
     cloud_loadbalancers = connect_to_cloud_loadbalancers(region=region)
@@ -545,6 +547,7 @@ def connect_to_services(region=None):
     cloud_blockstorage = connect_to_cloud_blockstorage(region=region)
     cloud_dns = connect_to_cloud_dns(region=region)
     cloud_networks = connect_to_cloud_networks(region=region)
+    cloud_monitoring = connect_to_cloud_monitoring(region=region)
 
 
 def _get_service_endpoint(svc, region=None, public=True):
