@@ -169,7 +169,6 @@ class BaseAuth(object):
         self.authenticated = True
 
 
-
     def _read_credential_file(self, cfg):
         """
         Implements the default (keystone) behavior.
@@ -301,7 +300,7 @@ class BaseAuth(object):
         user = access["user"]
         self.user = {}
         self.user["id"] = user["id"]
-        self.user["name"] = user["name"]
+        self.username = self.user["name"] = user["name"]
         self.user["roles"] = user["roles"]
 
 

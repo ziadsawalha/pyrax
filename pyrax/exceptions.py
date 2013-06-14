@@ -185,9 +185,6 @@ class MissingName(PyraxException):
 class MissingTemporaryURLKey(PyraxException):
     pass
 
-class MonitoringCheckTargetNotSpecified(PyraxException):
-    pass
-
 class NetworkCIDRInvalid(PyraxException):
     pass
 
@@ -391,7 +388,11 @@ def from_response(response, body):
         if resp.status != 200:
             raise exception_from_response(resp, body)
     """
-    cls = _code_map.get(response.status, ClientException)
+    if isinstance(response, dict):
+        status = response.get("status")
+    else:
+        status = response.status
+    cls = _code_map.get(status, ClientException)
     request_id = response.get("x-compute-request-id")
     if body:
         message = "n/a"
@@ -407,7 +408,7 @@ def from_response(response, body):
                 else:
                     message = error
                     details = None
-        return cls(code=response.status, message=message, details=details,
+        return cls(code=status, message=message, details=details,
                    request_id=request_id)
     else:
-        return cls(code=response.status, request_id=request_id)
+        return cls(code=status, request_id=request_id)
