@@ -83,7 +83,7 @@ except ImportError:
         if stack[1].endswith("/setup.py"):
             in_setup = True
     if not in_setup:
-         # This isn't a normal import problem during setup; re-raise
+        # This isn't a normal import problem during setup; re-raise
         raise
 
 # Initiate the services to None until we are authenticated.
@@ -121,6 +121,7 @@ _client_classes = {
         "volume": CloudBlockStorageClient,
         "dns": CloudDNSClient,
         "compute:network": CloudNetworkClient,
+        "monitor": CloudMonitorClient
         }
 
 
@@ -378,21 +379,6 @@ def _require_auth(fnc):
 def _safe_region(region=None):
     """Value to use when no region is specified."""
     return region or settings.get("region") or default_region
-
-
-
-
-
-
-@_assure_identity
-def auth_with_token(token, tenant_id=None, tenant_name=None, region=None):
-    identity.auth_with_token(token, tenant_id=tenant_id,
-            tenant_name=tenant_name)
-    connect_to_services(region=region)
-
-
-
-
 
 
 @_assure_identity
@@ -678,32 +664,25 @@ def connect_to_cloud_loadbalancers(region=None):
 
 def connect_to_cloud_blockstorage(region=None):
     """Creates a client for working with cloud blockstorage."""
-    return _create_client(ep_name="volume",
-            service_type="volume", region=region)
+    return _create_client(ep_name="volume", service_type="volume",
+            region=region)
 
 
 def connect_to_cloud_dns(region=None):
     """Creates a client for working with cloud dns."""
-    return _create_client(ep_name="dns",
-            service_type="rax:dns", region=region)
+    return _create_client(ep_name="dns", service_type="rax:dns", region=region)
 
 
 def connect_to_cloud_networks(region=None):
     """Creates a client for working with cloud networks."""
-    return _create_client(ep_name="compute:network",
-            service_type="compute", region=region)
+    return _create_client(ep_name="compute:network", service_type="compute",
+            region=region)
 
 
-@_require_auth
 def connect_to_cloud_monitoring(region=None):
     """Creates a client for working with cloud monitoring."""
-    region = _safe_region(region)
-    ep = _get_service_endpoint("monitor", region)
-    cloud_monitoring = CloudMonitorClient(region_name=region,
-            management_url=ep, http_log_debug=_http_debug,
-            service_type="rax:monitor")
-    cloud_monitoring.user_agent = _make_agent_name(cloud_monitoring.user_agent)
-    return cloud_monitoring
+    return _create_client(ep_name="monitor", service_type="monitor",
+            region=region)
 
 
 def get_http_debug():
