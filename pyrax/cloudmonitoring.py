@@ -125,16 +125,74 @@ class CloudMonitorNotificationManager(BaseManager):
         """
         Defines a notification for handling an alarm.
         """
-        label = label or name
-        print "CREATE NOTIFICATION"
+        uri = "/%s" % self.uri_base
+        body = {"label": label or name,
+                "type": utils.get_id(notification_type),
+                "details": details,
+                }
+        resp, resp_body = self.api.method_post(uri, body=body)
 
 
+    def test_notification(self, notification=None, notification_type=None,
+            details=None):
+        """
+        This allows you to test either an existing notification, or a potential
+        notification before creating it. The actual notification comes from the
+        same server where the actual alert messages come from. This allow you
+        to, among other things, verify that your firewall is configured
+        properly.
 
-class CloudMonitorNotificationTypeManager(BaseManager):
-    """
-    Handles all of the requests dealing with notification types.
-    """
-    pass
+        To test an existing notification, pass it as the 'notification'
+        parameter and leave the other parameters empty. To pre-test a
+        notification before creating it, leave 'notification' empty, but pass
+        in the 'notification_type' and 'details'.
+        """
+        if notification:
+            # Test an existing notification
+            uri = "/%s/%s/test" % (self.uri_base, utils.get_id(notification))
+            body = None
+        else:
+            uri = "/test-notification"
+            body = {"type": utils.get_id(notification_type),
+                    "details": details}
+        resp, resp_body = self.api.method_post(uri, body=body)
+
+
+    def update_notification(self, notification, details):
+        """
+        Updates the specified notification with the supplied details.
+        """
+        if isinstance(notification, CloudMonitorNotification):
+            nid = notification.id
+            ntyp = notification.type
+        else:
+            # Supplied an ID
+            nfcn = self.get(notification)
+            nid = notification
+            ntyp = nfcn.type
+        uri = "/%s/%s" % (self.uri_base, nid)
+        body = {"type": ntyp,
+                "details": details}
+        resp, resp_body = self.api.method_put(uri, body=body)
+
+
+    def list_types(self):
+        """
+        Returns a list of all available notification types.
+        """
+        uri = "/notification_types"
+        resp, resp_body = self.api.method_get(uri)
+        return [CloudMonitorNotificationType(self, info)
+                for info in resp_body["values"]]
+
+
+    def get_type(self, notification_type_id):
+        """
+        Returns a CloudMonitorNotificationType object for the given ID.
+        """
+        uri = "/notification_types/%s" % utils.get_id(notification_type_id)
+        resp, resp_body = self.api.method_get(uri)
+        return CloudMonitorNotificationType(self, resp_body)
 
 
 
@@ -146,10 +204,32 @@ class CloudMonitorNotificationPlanManager(BaseManager):
             warning_state=None):
         """
         Creates a notification plan to be executed when a monitoring check
-        triggers an alarm.
+        triggers an alarm. You can optionally label (or name) the plan.
+
+        A plan consists of one or more notifications to be executed when an
+        associated alarm is triggered. You can have different lists of actions
+        for CRITICAL, WARNING or OK states.
         """
-        label = label or name
-        print "CREATE NOTIFICATION PLAN"
+        uri = "/%s" % self.uri_base
+        body = {"label": label or name}
+
+        def make_list_of_ids(parameter):
+            params = utils.coerce_string_to_list(parameter)
+            return [utils.get_id(param) for param in params]
+
+        if critical_state:
+            critical_state = utils.coerce_string_to_list(critical_state)
+            body["critical_state"] = make_list_of_ids(critical_state)
+        if warning_state:
+            warning_state = utils.coerce_string_to_list(warning_state)
+            body["warning_state"] = make_list_of_ids(warning_state)
+        if ok_state:
+            ok_state = utils.coerce_string_to_list(ok_state)
+            body["ok_state"] = make_list_of_ids(ok_state)
+        print "BODY", body
+        resp, resp_body = self.api.method_post(uri, body=body)
+        print "RESP", resp
+        print "RBODY", resp_body
 
 
 
@@ -563,6 +643,13 @@ class CloudMonitorNotification(BaseResource):
         return self.label
 
 
+    def update(self, details):
+        """
+        Updates this notification with the supplied details.
+        """
+        return self.manager.update_notification(self, details)
+
+
 
 class CloudMonitorNotificationType(BaseResource):
     """
@@ -611,10 +698,6 @@ class CloudMonitorClient(BaseClient):
         self._notification_manager = CloudMonitorNotificationManager(self,
                 uri_base="notifications",
                 resource_class=CloudMonitorNotification,
-                response_key=None, plural_response_key=None)
-        self._notification_type_manager = CloudMonitorNotificationTypeManager(
-                self, uri_base="notification_types",
-                resource_class=CloudMonitorNotificationType,
                 response_key=None, plural_response_key=None)
         self._notification_plan_manager = CloudMonitorNotificationPlanManager(
                 self, uri_base="notification_plans",
@@ -755,6 +838,37 @@ class CloudMonitorClient(BaseClient):
                 start, end, points=points, resolution=resolution, stats=stats)
 
 
+    def list_notifications(self):
+        """Returns a list of all defined notifications."""
+        return self._notification_manager.list()
+
+
+    def get_notification(self, notification_id):
+        """
+        Returns the CloudMonitorNotification object for the specified ID.
+        """
+        return self._notification_manager.get(notification_id)
+
+
+    def test_notification(self, notification=None, notification_type=None,
+            details=None):
+        """
+        This allows you to test either an existing notification, or a potential
+        notification before creating it. The actual notification comes from the
+        same server where the actual alert messages come from. This allow you
+        to, among other things, verify that your firewall is configured
+        properly.
+
+        To test an existing notification, pass it as the 'notification'
+        parameter and leave the other parameters empty. To pre-test a
+        notification before creating it, leave 'notification' empty, but pass
+        in the 'notification_type' and 'details'.
+        """
+        return self._notification_manager.test_notification(
+                notification=notification, notification_type=notification_type,
+                details=details)
+
+
     def create_notification(self, notification_type, label=None, name=None,
             details=None):
         """
@@ -762,6 +876,21 @@ class CloudMonitorClient(BaseClient):
         """
         return self._notification_manager.create(notification_type,
                 label=label, name=name, details=details)
+
+
+    def update_notification(self, notification, details):
+        """
+        Updates the specified notification with the supplied details.
+        """
+        return self._notification_manager.update_notification(notification,
+                details)
+
+
+    def delete_notification(self, notification):
+        """
+        Deletes the specified notification.
+        """
+        return self._notification_manager.delete(notification)
 
 
     def create_notification_plan(self, label=None, name=None,
@@ -787,11 +916,11 @@ class CloudMonitorClient(BaseClient):
 
 
     def list_notification_types(self):
-        return self._notification_type_manager.list()
+        return self._notification_manager.list_types()
 
 
     def get_notification_type(self, nt_id):
-        return self._notification_type_manager.get(nt_id)
+        return self._notification_manager.get_type(nt_id)
 
 
     def list_monitoring_zones(self):
