@@ -17,7 +17,6 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from functools import wraps
 import re
 
 from pyrax.client import BaseClient
@@ -100,15 +99,47 @@ class CloudMonitorEntity(BaseResource):
                 points=points, resolution=resolution, stats=stats)
 
 
-    def create_alarm(self, check, notification, criteria=None, disabled=False,
-            label=None, name=None, metadata=None):
+    def create_alarm(self, check, notification_plan, criteria=None,
+            disabled=False, label=None, name=None, metadata=None):
         """
         Creates an alarm that binds the check on this entity with a
         notification plan.
         """
-        return self.manager.create_alarm(self, check, notification,
+        return self.manager.create_alarm(self, check, notification_plan,
                 criteria=criteria, disabled=disabled, label=label, name=name,
                 metadata=metadata)
+
+
+    def update_alarm(self, alarm, criteria=None, disabled=False,
+            label=None, name=None, metadata=None):
+        """
+        Updates an existing alarm on this entity.
+        """
+        return self.manager.update_alarm(self, alarm, disabled=disabled,
+                label=label, name=name, metadata=metadata)
+
+
+    def list_alarms(self):
+        """
+        Returns a list of all the alarms created on this entity.
+        """
+        return self.manager.list_alarms(self)
+
+
+    def get_alarm(self, alarm):
+        """
+        Returns the alarm with the specified ID for this entity. If a
+        CloudMonitorAlarm instance is passed, returns a new CloudMonitorAlarm
+        object with the current state from the API.
+        """
+        return self.manager.get_alarm(self, alarm)
+
+
+    def delete_alarm(self, alarm):
+        """
+        Deletes the specified alarm.
+        """
+        return self.manager.delete_alarm(self, alarm)
 
 
     @property
@@ -226,10 +257,7 @@ class CloudMonitorNotificationPlanManager(BaseManager):
         if ok_state:
             ok_state = utils.coerce_string_to_list(ok_state)
             body["ok_state"] = make_list_of_ids(ok_state)
-        print "BODY", body
         resp, resp_body = self.api.method_post(uri, body=body)
-        print "RESP", resp
-        print "RBODY", resp_body
 
 
 
@@ -257,10 +285,8 @@ class CloudMonitorEntityManager(BaseManager):
         """
         uri = "/%s/%s/checks" % (self.uri_base, utils.get_id(entity))
         resp, resp_body = self.api.method_get(uri)
-        checks = [CloudMonitorCheck(self, val) for val in resp_body["values"]]
-        for check in checks:
-            check.entity = entity
-        return checks
+        return [CloudMonitorCheck(self, val, entity)
+                for val in resp_body["values"]]
 
 
     def create_check(self, entity, label=None, name=None, check_type=None,
@@ -303,10 +329,7 @@ class CloudMonitorEntityManager(BaseManager):
                 "details": details,
                 "disabled": disabled,
                 }
-        if isinstance(check_type, CloudMonitorCheckType):
-            body["type"] = check_type.id
-        else:
-            body["type"] = check_type
+        body["type"] = utils.get_id(check_type)
         params = ("monitoring_zones_poll", "timeout", "period",
                 "target_alias", "target_hostname", "target_receiver")
         body = _params_to_dict(params, body, locals())
@@ -403,9 +426,7 @@ class CloudMonitorEntityManager(BaseManager):
         uri = "/%s/%s/checks/%s" % (self.uri_base, utils.get_id(entity),
                 utils.get_id(check))
         resp, resp_body = self.api.method_get(uri)
-        check = CloudMonitorCheck(self, resp_body)
-        check.entity = entity
-        return check
+        return CloudMonitorCheck(self, resp_body, entity)
 
 
     def delete_check(self, entity, check):
@@ -439,23 +460,14 @@ class CloudMonitorEntityManager(BaseManager):
 
         The 'points' parameter represents the number of points to return. The
         'resolution' parameter represents the granularity of the data. You must
-        specify either 'points' or 'resolution'. The allowed values for
-        resolution are:
-            FULL
-            MIN5
-            MIN20
-            MIN60
-            MIN240
-            MIN1440
+        specify either 'points' or 'resolution', but not both. The allowed
+        values for resolution are: 'FULL', 'MIN5', 'MIN20', 'MIN60', 'MIN240',
+        and 'MIN1440'.
 
         Finally, the 'stats' parameter specifies the stats you want returned.
         By default only the 'average' is returned. You omit this parameter,
         pass in a single value, or pass in a list of values. The allowed values
-        are:
-            average
-            variance
-            min
-            max
+        are: 'average', 'variance', 'min', and 'max'
         """
         allowed_resolutions = ("FULL", "MIN5", "MIN20", "MIN60", "MIN240",
                 "MIN1440")
@@ -497,13 +509,85 @@ class CloudMonitorEntityManager(BaseManager):
         return resp_body["values"]
 
 
-    def create_alarm(self, entity, check, notification, criteria=None,
+    def create_alarm(self, entity, check, notification_plan, criteria=None,
             disabled=False, label=None, name=None, metadata=None):
         """
         Creates an alarm that binds the check on the given entity with a
         notification plan.
+
+        Note that the 'criteria' parameter, if supplied, should be a string
+        representing the DSL for describing alerting conditions and their
+        output states. Pyrax does not do any validation of these criteria
+        statements; it is up to you as the developer to understand the language
+        and correctly form the statement. This alarm language is documented
+        online in the Cloud Monitoring section of http://docs.rackspace.com.
         """
-        pass
+        uri = "/%s/%s/alarms" % (self.uri_base, utils.get_id(entity))
+        body = {"check_id": utils.get_id(check),
+                "notification_plan_id": utils.get_id(notification_plan),
+                }
+        if criteria:
+            body["criteria"] = criteria
+        if disabled:
+            body["disabled"] = disabled
+        label_name = label or name
+        if label_name:
+            body["label"] = label_name
+        if metadata:
+            body["metadata"] = metadata
+        resp, resp_body = self.api.method_post(uri, body=body)
+
+
+    def update_alarm(self, entity, alarm, criteria=None, disabled=False,
+            label=None, name=None, metadata=None):
+        """
+        Updates an existing alarm on the given entity. See the comments on the
+        'create_alarm()' regarding the criteria parameter.
+        """
+        uri = "/%s/%s/alarms/%s" % (self.uri_base, utils.get_id(entity),
+                utils.get_id(alarm))
+        body = {}
+        if criteria:
+            body["criteria"] = criteria
+        if disabled:
+            body["disabled"] = disabled
+        label_name = label or name
+        if label_name:
+            body["label"] = label_name
+        if metadata:
+            body["metadata"] = metadata
+        resp, resp_body = self.api.method_put(uri, body=body)
+
+
+    def list_alarms(self, entity):
+        """
+        Returns a list of all the alarms created on the specified entity.
+        """
+        uri = "/%s/%s/alarms" % (self.uri_base, utils.get_id(entity))
+        resp, resp_body = self.api.method_get(uri)
+        return [CloudMonitorAlarm(self, dct, entity)
+                for dct in resp_body["values"]]
+
+
+    def get_alarm(self, entity, alarm):
+        """
+        Returns the alarm with the specified ID for this entity. If a
+        CloudMonitorAlarm instance is passed, returns a new CloudMonitorAlarm
+        object with the current state from the API.
+        """
+        uri = "/%s/%s/alarms/%s" % (self.uri_base, utils.get_id(entity),
+                utils.get_id(alarm))
+        resp, resp_body = self.api.method_get(uri)
+        return CloudMonitorAlarm(self, resp_body, entity)
+
+
+    def delete_alarm(self, entity, alarm):
+        """
+        Deletes the specified alarm.
+        """
+        uri = "/%s/%s/alarms/%s" % (self.uri_base, utils.get_id(entity),
+                utils.get_id(alarm))
+        resp, resp_body = self.api.method_delete(uri)
 
 
 
@@ -511,6 +595,14 @@ class CloudMonitorCheck(BaseResource):
     """
     Represents a check defined for an entity.
     """
+    def __init__(self, manager, info, entity, key=None, loaded=False):
+        super(CloudMonitorCheck, self).__init__(manager, info, key=key,
+                loaded=loaded)
+        if not isinstance(entity, CloudMonitorEntity):
+            entity = manager.get(entity)
+        self.entity = entity
+
+
     @property
     def name(self):
         return self.label
@@ -582,14 +674,14 @@ class CloudMonitorCheck(BaseResource):
                 start, end, points=points, resolution=resolution, stats=stats)
 
 
-    def create_alarm(self, notification, criteria=None, disabled=False,
+    def create_alarm(self, notification_plan, criteria=None, disabled=False,
             label=None, name=None, metadata=None):
         """
         Creates an alarm that binds this check with a notification plan.
         """
-        return self.manager.create_alarm(self.entity, self, notification,
-                criteria=criteria, disabled=disabled, label=label, name=name,
-                metadata=metadata)
+        return self.entity.manager.create_alarm(self.entity, self,
+                notification_plan, criteria=criteria, disabled=disabled,
+                label=label, name=name, metadata=metadata)
 
 
 
@@ -663,9 +755,49 @@ class CloudMonitorNotificationType(BaseResource):
 
 class CloudMonitorNotificationPlan(BaseResource):
     """
-    A Notification plan ties together alarms triggered by entity checks with
-    actions to notify the administrator.
+    A Notification plan is a list of the notification actions to take when an
+    alarm is triggered.
     """
+    @property
+    def name(self):
+        return self.label
+
+
+
+class CloudMonitorAlarm(BaseResource):
+    """
+    Alarms bind alerting rules, entities, and notification plans into a logical
+    unit.
+    """
+    def __init__(self, manager, info, entity, key=None, loaded=False):
+        super(CloudMonitorAlarm, self).__init__(manager, info, key=key,
+                loaded=loaded)
+        if not isinstance(entity, CloudMonitorEntity):
+            entity = manager.get(entity)
+        self.entity = entity
+
+
+    def update(self, criteria=None, disabled=False, label=None, name=None,
+            metadata=None):
+        """
+        Updates this alarm.
+        """
+        return self.entity.update_alarm(self, disabled=disabled, label=label,
+                name=name, metadata=metadata)
+
+
+    def get(self):
+        """
+        Fetches the current state of the alarm from the API and updates the
+        object.
+        """
+        new_alarm = self.entity.get_alarm(self)
+        if new_alarm:
+            self._add_details(new_alarm._info)
+    # Alias reload() to get()
+    reload = get
+
+
     @property
     def name(self):
         return self.label
@@ -703,6 +835,37 @@ class CloudMonitorClient(BaseClient):
                 self, uri_base="notification_plans",
                 resource_class=CloudMonitorNotificationPlan,
                 response_key=None, plural_response_key=None)
+
+
+    def get_account(self):
+        """
+        Returns a dict with the following keys: id, webhook_token, and metadata.
+        """
+        resp, resp_body = self.method_get("/account")
+        return resp_body
+
+
+    def get_limits(self):
+        """
+        Returns a dict with the resource and rate limits for the account.
+        """
+        resp, resp_body = self.method_get("/limits")
+        return resp_body
+
+
+    def get_audits(self):
+        """
+        Every write operation performed against the API (PUT, POST or DELETE)
+        generates an audit record that is stored for 30 days. Audits record a
+        variety of information about the request including the method, URL,
+        headers, query string, transaction ID, the request body and the
+        response code. They also store information about the action performed
+        including a JSON list of the previous state of any modified objects.
+        For example, if you perform an update on an entity, this will record
+        the state of the entity before modification.
+        """
+        resp, resp_body = self.method_get("/audits")
+        return resp_body["values"]
 
 
     def list_entities(self):
@@ -775,7 +938,7 @@ class CloudMonitorClient(BaseClient):
 
     def get_check(self, entity, check):
         """Returns the current check for the given entity."""
-        return self.manager.get_check(entity, check)
+        return self._entity_manager.get_check(entity, check)
 
 
     def update_check(self, entity, check, label=None, name=None, disabled=None,
@@ -847,7 +1010,7 @@ class CloudMonitorClient(BaseClient):
         """
         Returns the CloudMonitorNotification object for the specified ID.
         """
-        return self._notification_manager.get(notification_id)
+        return self._notification_manager.get( notification_id)
 
 
     def test_notification(self, notification=None, notification_type=None,
@@ -904,15 +1067,59 @@ class CloudMonitorClient(BaseClient):
                 warning_state=warning_state)
 
 
-    def create_alarm(self, entity, check, notification, criteria=None,
+    def list_notification_plans(self):
+        """
+        Returns a list of all defined notification plans.
+        """
+        return self._notification_plan_manager.list()
+
+
+    def get_notification_plan(self, notification_plan_id):
+        """
+        Returns the CloudMonitorNotificationPlan object for the specified ID.
+        """
+        return self._notification_plan_manager.get( notification_plan_id)
+
+
+    def create_alarm(self, entity, check, notification_plan, criteria=None,
             disabled=False, label=None, name=None, metadata=None):
         """
         Creates an alarm that binds the check on the given entity with a
         notification plan.
         """
-        return self._entity_manager.create_alarm(entity, check, notification,
-                criteria=criteria, disabled=disabled, label=label, name=name,
-                metadata=metadata)
+        return self._entity_manager.create_alarm(entity, check,
+            notification_plan, criteria=criteria, disabled=disabled,
+            label=label, name=name, metadata=metadata)
+
+
+    def update_alarm(self, entity, alarm, criteria=None, disabled=False,
+            label=None, name=None, metadata=None):
+        """
+        Updates an existing alarm on the given entity.
+        """
+        return self._entity_manager.update_alarm(entity, alarm,
+                disabled=disabled, label=label, name=name, metadata=metadata)
+
+
+    def list_alarms(self, entity):
+        """
+        Returns a list of all the alarms created on the specified entity.
+        """
+        return self._entity_manager.list_alarms(entity)
+
+
+    def get_alarm(self, entity, alarm_id):
+        """
+        Returns the alarm with the specified ID for the entity.
+        """
+        return self._entity_manager.get_alarm(entity, alarm_id)
+
+
+    def delete_alarm(self, entity, alarm):
+        """
+        Deletes the specified alarm.
+        """
+        return self._entity_manager.delete_alarm(entity, alarm)
 
 
     def list_notification_types(self):
