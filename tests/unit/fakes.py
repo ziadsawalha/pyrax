@@ -27,6 +27,7 @@ from pyrax.clouddns import CloudDNSRecord
 from pyrax.clouddns import CloudDNSPTRRecord
 from pyrax.cloudnetworks import CloudNetwork
 from pyrax.cloudnetworks import CloudNetworkClient
+from pyrax.cloudmonitoring import CloudMonitorClient
 
 import pyrax.exceptions as exc
 from pyrax.identity.rax_identity import RaxIdentity
@@ -376,6 +377,13 @@ class FakeCloudNetwork(CloudNetwork):
         super(FakeCloudNetwork, self).__init__(manager=None, info=info, *args,
                 **kwargs)
         self.id = uuid.uuid4()
+
+
+class FakeCloudMonitorClient(CloudMonitorClient):
+    def __init__(self, *args, **kwargs):
+        self._flavor_manager = FakeManager()
+        super(FakeCloudMonitorClient, self).__init__("fakeuser",
+                "fakepassword", *args, **kwargs)
 
 
 class FakeIdentity(RaxIdentity):
