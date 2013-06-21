@@ -400,7 +400,7 @@ class CloudMonitoringTest(unittest.TestCase):
         ent = self.entity
         clt = self.client
         mgr = clt._entity_manager
-        err = exc.BadRequest()
+        err = exc.BadRequest(400)
         err.message = "Validation error for key 'fake'"
         err.details = "Validation failed for 'fake'"
         clt.method_post = Mock(side_effect=err)
