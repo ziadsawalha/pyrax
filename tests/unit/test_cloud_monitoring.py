@@ -396,6 +396,18 @@ class CloudMonitoringTest(unittest.TestCase):
                 ent, details="fake", target_alias="fake",
                 check_type="remote.fake")
 
+    def test_entity_mgr_create_check_invalid_details(self):
+        ent = self.entity
+        clt = self.client
+        mgr = clt._entity_manager
+        err = exc.BadRequest()
+        err.message = "Validation error for key 'fake'"
+        err.details = "Validation failed for 'fake'"
+        clt.method_post = Mock(side_effect=err)
+        self.assertRaises(exc.InvalidMonitoringCheckDetails, mgr.create_check,
+                ent, details="fake", target_alias="fake",
+                check_type="remote.fake", monitoring_zones_poll="fake")
+
 
 
 if __name__ == "__main__":
