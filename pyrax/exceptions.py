@@ -185,6 +185,12 @@ class MissingName(PyraxException):
 class MissingTemporaryURLKey(PyraxException):
     pass
 
+class MonitoringCheckTargetNotSpecified(PyraxException):
+    pass
+
+class MonitoringZonesPollMissing(PyraxException):
+    pass
+
 class NetworkCIDRInvalid(PyraxException):
     pass
 

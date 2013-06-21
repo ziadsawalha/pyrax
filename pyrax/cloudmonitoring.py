@@ -95,8 +95,8 @@ class CloudMonitorEntity(BaseResource):
             min
             max
         """
-        return self.manager.get_metric_data_points(self, check, start, end,
-                points=points, resolution=resolution, stats=stats)
+        return self.manager.get_metric_data_points(self, check, metric, start,
+                end, points=points, resolution=resolution, stats=stats)
 
 
     def create_alarm(self, check, notification_plan, criteria=None,
@@ -115,8 +115,8 @@ class CloudMonitorEntity(BaseResource):
         """
         Updates an existing alarm on this entity.
         """
-        return self.manager.update_alarm(self, alarm, disabled=disabled,
-                label=label, name=name, metadata=metadata)
+        return self.manager.update_alarm(self, alarm, criteria=criteria,
+                disabled=disabled, label=label, name=name, metadata=metadata)
 
 
     def list_alarms(self):
@@ -309,27 +309,24 @@ class CloudMonitorEntityManager(BaseManager):
         if details is None:
             raise exc.MissingMonitoringCheckDetails("The required 'details' "
                     "parameter was not passed to the create_check() method.")
-        if not target_alias or target_hostname:
+        if not (target_alias or target_hostname):
             raise exc.MonitoringCheckTargetNotSpecified("You must specify "
                     "either the 'target_alias' or 'target_hostname' when "
                     "creating a check.")
-        if isinstance(check_type, CloudMonitorCheckType):
-            ctype = check_type.id
-        else:
-            ctype = check_type
+        ctype = utils.get_id(check_type)
         is_remote = ctype.startswith("remote")
         monitoring_zones_poll = utils.coerce_string_to_list(
                 monitoring_zones_poll)
         monitoring_zones_poll = [utils.get_id(mzp)
                 for mzp in monitoring_zones_poll]
         if is_remote and not monitoring_zones_poll:
-            raise MonitoringZonesPollMissing("You must specify the "
+            raise exc.MonitoringZonesPollMissing("You must specify the "
                     "'monitoring_zones_poll' parameter for remote checks.")
         body = {"label": label or name,
                 "details": details,
                 "disabled": disabled,
+                "type": utils.get_id(check_type),
                 }
-        body["type"] = utils.get_id(check_type)
         params = ("monitoring_zones_poll", "timeout", "period",
                 "target_alias", "target_hostname", "target_receiver")
         body = _params_to_dict(params, body, locals())
