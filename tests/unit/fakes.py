@@ -405,6 +405,14 @@ class FakeCloudMonitorEntity(CloudMonitorEntity):
         self.id = utils.random_name()
 
 
+class FakeCloudMonitorCheck(CloudMonitorCheck):
+    def __init__(self, entity, *args, **kwargs):
+        info = kwargs.pop("info", {"fake": "fake"})
+        super(FakeCloudMonitorCheck, self).__init__(None, info, entity,
+                *args, **kwargs)
+        self.id = uuid.uuid4()
+
+
 class FakeCloudMonitorNotification(CloudMonitorNotification):
     def __init__(self, *args, **kwargs):
         info = kwargs.pop("info", {"fake": "fake"})

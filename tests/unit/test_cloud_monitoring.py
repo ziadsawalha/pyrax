@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import datetime
 import random
 import unittest
 
@@ -407,6 +408,132 @@ class CloudMonitoringTest(unittest.TestCase):
         self.assertRaises(exc.InvalidMonitoringCheckDetails, mgr.create_check,
                 ent, details="fake", target_alias="fake",
                 check_type="remote.fake", monitoring_zones_poll="fake")
+
+    def test_entity_mgr_find_all_checks(self):
+        ent = self.entity
+        clt = self.client
+        mgr = clt._entity_manager
+        c1 = fakes.FakeCloudMonitorCheck(ent, info={"foo": "fake"})
+        c2 = fakes.FakeCloudMonitorCheck(ent, info={"foo": "real"})
+        c3 = fakes.FakeCloudMonitorCheck(ent, info={"foo": "fake"})
+        mgr.list_checks = Mock(return_value=[c1, c2, c3])
+        found = mgr.find_all_checks(ent, foo="fake")
+        self.assertEqual(len(found), 2)
+        self.assertTrue(c1 in found)
+        self.assertTrue(c2 not in found)
+        self.assertTrue(c3 in found)
+
+    def test_entity_mgr_update_check(self):
+        ent = self.entity
+        clt = self.client
+        mgr = clt._entity_manager
+        chk = fakes.FakeCloudMonitorCheck(ent)
+        label = utils.random_name()
+        name = utils.random_name()
+        check_type = utils.random_name()
+        details = utils.random_name()
+        disabled = utils.random_name()
+        metadata = utils.random_name()
+        monitoring_zones_poll = utils.random_name()
+        timeout = utils.random_name()
+        period = utils.random_name()
+        target_alias = utils.random_name()
+        target_hostname = utils.random_name()
+        target_receiver = utils.random_name()
+        test_only = False
+        include_debug = False
+        clt.method_put = Mock(return_value=(None, None))
+        exp_uri = "/%s/%s/checks/%s" % (mgr.uri_base, ent.id, chk.id)
+        exp_body = {"label": label or name, "metadata": metadata, "disabled":
+            disabled, "monitoring_zones_poll": [monitoring_zones_poll],
+            "timeout": timeout, "period": period, "target_alias": target_alias,
+            "target_hostname": target_hostname, "target_receiver":
+            target_receiver}
+        mgr.update_check(chk, label=label, name=name, disabled=disabled,
+                metadata=metadata, monitoring_zones_poll=monitoring_zones_poll,
+                timeout=timeout, period=period, target_alias=target_alias,
+                target_hostname=target_hostname,
+                target_receiver=target_receiver)
+        clt.method_put.assert_called_once_with(exp_uri, body=exp_body)
+
+    def test_entity_mgr_get_check(self):
+        ent = self.entity
+        clt = self.client
+        mgr = clt._entity_manager
+        id_ = utils.random_name()
+        ret_body = {"id": id_}
+        clt.method_get = Mock(return_value=(None, ret_body))
+        ret = mgr.get_check(ent, id_)
+        exp_uri = "/%s/%s/checks/%s" % (mgr.uri_base, ent.id, id_)
+        clt.method_get.assert_called_once_with(exp_uri)
+        self.assertTrue(isinstance(ret, CloudMonitorCheck))
+        self.assertEqual(ret.id, id_) 
+
+    def test_entity_mgr_delete_check(self):
+        ent = self.entity
+        clt = self.client
+        mgr = clt._entity_manager
+        id_ = utils.random_name()
+        clt.method_delete = Mock(return_value=(None, None))
+        ret = mgr.delete_check(ent, id_)
+        exp_uri = "/%s/%s/checks/%s" % (mgr.uri_base, ent.id, id_)
+        clt.method_delete.assert_called_once_with(exp_uri)
+
+    def test_entity_mgr_list_metrics(self):
+        ent = self.entity
+        clt = self.client
+        mgr = clt._entity_manager
+        id_ = utils.random_name()
+        met1 = utils.random_name()
+        met2 = utils.random_name()
+        ret_body = {"values": [{"name": met1}, {"name": met2}]}
+        clt.method_get = Mock(return_value=(None, ret_body))
+        ret = mgr.list_metrics(ent, id_)
+        exp_uri = "/%s/%s/checks/%s/metrics" % (mgr.uri_base, ent.id, id_)
+        clt.method_get.assert_called_once_with(exp_uri)
+        self.assertEqual(len(ret), 2)
+        self.assertTrue(met1 in ret)
+        self.assertTrue(met2 in ret)
+
+    def test_entity_mgr_get_metric_data_points_no_granularity(self):
+        ent = self.entity
+        clt = self.client
+        mgr = clt._entity_manager
+        self.assertRaises(exc.MissingMonitoringCheckGranularity,
+                mgr.get_metric_data_points, None, None, None, None, None)
+
+    def test_entity_mgr_get_metric_data_points_invalid_resolution(self):
+        ent = self.entity
+        clt = self.client
+        mgr = clt._entity_manager
+        self.assertRaises(exc.InvalidMonitoringMetricsResolution,
+                mgr.get_metric_data_points, None, None, None, None, None,
+                resolution="INVALID")
+
+    def test_entity_mgr_get_metric_data_points(self):
+        ent = self.entity
+        clt = self.client
+        mgr = clt._entity_manager
+        chk_id = utils.random_name()
+        metric = utils.random_name()
+        resolution = "FULL"
+        end = datetime.datetime.now()
+        start = end - datetime.timedelta(days=7)
+        start_stamp = int(utils.to_timestamp(start))
+        end_stamp = int(utils.to_timestamp(end))
+        stats = ["foo", "bar"]
+        exp_qp = "from=%s&to=%s&resolution=%s&select=%s&select=%s" % (
+                start_stamp, end_stamp, resolution, stats[0], stats[1])
+        exp_uri = "/%s/%s/checks/%s/metrics/%s/plot?%s" % (mgr.uri_base, ent.id,
+                chk_id, metric, exp_qp)
+        vals = utils.random_name()
+        ret_body = {"values": vals}
+        clt.method_get = Mock(return_value=(None, ret_body))
+        ret = mgr.get_metric_data_points(ent, chk_id, metric, start, end,
+                resolution=resolution, stats=stats)
+        clt.method_get.assert_called_once_with(exp_uri)
+        self.assertEqual(ret, vals)
+
 
 
 

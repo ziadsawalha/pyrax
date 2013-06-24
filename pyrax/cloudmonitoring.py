@@ -365,7 +365,8 @@ class CloudMonitorEntityManager(BaseManager):
 
     def find_all_checks(self, entity, **kwargs):
         """
-        Finds all checks with attributes matching ``**kwargs``.
+        Finds all checks for a given entity with attributes matching
+        ``**kwargs``.
 
         This isn't very efficient: it loads the entire list then filters on
         the Python side.
@@ -377,7 +378,6 @@ class CloudMonitorEntityManager(BaseManager):
                 if all(getattr(obj, attr) == value
                         for (attr, value) in searches):
                     found.append(obj)
-                    print "FOUND", obj.id
             except AttributeError:
                 continue
         return found
@@ -936,6 +936,17 @@ class CloudMonitorClient(BaseClient):
     def get_check(self, entity, check):
         """Returns the current check for the given entity."""
         return self._entity_manager.get_check(entity, check)
+
+
+    def find_all_checks(self, entity, **kwargs):
+        """
+        Finds all checks for a given entity with attributes matching
+        ``**kwargs``.
+
+        This isn't very efficient: it loads the entire list then filters on
+        the Python side.
+        """
+        return self._entity_manager.find_all_checks(entity, **kwargs)
 
 
     def update_check(self, entity, check, label=None, name=None, disabled=None,
