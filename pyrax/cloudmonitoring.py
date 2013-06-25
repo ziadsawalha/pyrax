@@ -525,7 +525,7 @@ class CloudMonitorEntityManager(BaseManager):
                 }
         if criteria:
             body["criteria"] = criteria
-        if disabled:
+        if disabled is not None:
             body["disabled"] = disabled
         label_name = label or name
         if label_name:
@@ -546,7 +546,7 @@ class CloudMonitorEntityManager(BaseManager):
         body = {}
         if criteria:
             body["criteria"] = criteria
-        if disabled:
+        if disabled is not None:
             body["disabled"] = disabled
         label_name = label or name
         if label_name:

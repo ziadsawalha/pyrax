@@ -406,8 +406,9 @@ class FakeCloudMonitorEntity(CloudMonitorEntity):
 
 
 class FakeCloudMonitorCheck(CloudMonitorCheck):
-    def __init__(self, entity, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         info = kwargs.pop("info", {"fake": "fake"})
+        entity = kwargs.pop("entity", FakeCloudMonitorEntity())
         super(FakeCloudMonitorCheck, self).__init__(None, info, entity,
                 *args, **kwargs)
         self.id = uuid.uuid4()
