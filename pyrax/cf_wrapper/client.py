@@ -53,6 +53,9 @@ def handle_swiftclient_exception(fnc):
                 cont, fname = failed_upload.groups()
                 raise exc.UploadFailed("Upload of file '%(fname)s' to "
                         "container '%(cont)s' failed." % locals())
+            if e.http_status == 404:
+                raise exc.NoSuchObject("The requested object/container does "
+                        "not exist.")
             # Not handled; re-raise
             raise
     return _wrapped
@@ -432,9 +435,17 @@ class CFClient(object):
 
     def get_object(self, container, obj_name):
         """Returns a StorageObject instance for the object in the container."""
-        cont = self.get_container(container)
-        obj = cont.get_object(self._resolve_name(obj_name))
-        return obj
+        # NOTE: This is a hack to get around a bug in the current version of
+        # the swiftclient library.
+        for attempts in range(2):
+            try:
+                cont = self.get_container(container)
+                obj = cont.get_object(self._resolve_name(obj_name))
+                return obj
+            except (exc.NoSuchContainer, exc.NoSuchObject) as e:
+                continue
+        # If we made it to here, it is an actual exception
+        raise
 
 
     @handle_swiftclient_exception
@@ -1065,7 +1076,7 @@ class CFClient(object):
                 email_addresses = [email_addresses]
             emls = ", ".join(email_addresses)
             hdrs = {"X-Purge-Email": emls}
-        response = self.connection.cdn_request("DELETE", ct.name, oname,
+        response = self.connection.cdn_request("DELETE", [ct.name, oname],
                 hdrs=hdrs)
         # Read the response to force it to close for the next request.
         response.read()
