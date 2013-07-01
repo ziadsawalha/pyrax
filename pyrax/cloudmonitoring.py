@@ -676,9 +676,9 @@ class CloudMonitorCheck(BaseResource):
         """
         Creates an alarm that binds this check with a notification plan.
         """
-        return self.entity.manager.create_alarm(self.entity, self,
-                notification_plan, criteria=criteria, disabled=disabled,
-                label=label, name=name, metadata=metadata)
+        return self.manager.create_alarm(self.entity, self, notification_plan,
+                criteria=criteria, disabled=disabled, label=label, name=name,
+                metadata=metadata)
 
 
 
@@ -779,8 +779,8 @@ class CloudMonitorAlarm(BaseResource):
         """
         Updates this alarm.
         """
-        return self.entity.update_alarm(self, disabled=disabled, label=label,
-                name=name, metadata=metadata)
+        return self.entity.update_alarm(self, criteria=criteria,
+                disabled=disabled, label=label, name=name, metadata=metadata)
 
 
     def get(self):
@@ -873,13 +873,13 @@ class CloudMonitorClient(BaseClient):
         return self._entity_manager.get(entity)
 
 
-    def create_entity(self, name=None, label=None, agent=None,
+    def create_entity(self, label=None, name=None, agent=None,
             ip_addresses=None, metadata=None):
         # NOTE: passing a non-None value for ip_addresses is required so that
         # the _create_body() method can distinguish this as a request for a
         # body dict for entities.
         ip_addresses = ip_addresses or {}
-        resp = self._entity_manager.create(name=name, label=label, agent=agent,
+        resp = self._entity_manager.create(label=label, name=name, agent=agent,
                 ip_addresses=ip_addresses, metadata=metadata,
                 return_response=True)
         status = resp["status"]
@@ -924,7 +924,7 @@ class CloudMonitorClient(BaseClient):
         and the value as the desired setting.
         """
         return self._entity_manager.create_check(entity, label=label,
-                name=name, check_type=check_type, disabled=False,
+                name=name, check_type=check_type, disabled=disabled,
                 metadata=metadata, details=details,
                 monitoring_zones_poll=monitoring_zones_poll, timeout=timeout,
                 period=period, target_alias=target_alias,
@@ -956,8 +956,8 @@ class CloudMonitorClient(BaseClient):
         """
         Updates an existing check with any of the parameters.
         """
-        self._entity_manager.update_check(self, label=label, name=name,
-                disabled=disabled, metadata=metadata,
+        self._entity_manager.update_check(entity, check, label=label,
+                name=name, disabled=disabled, metadata=metadata,
                 monitoring_zones_poll=monitoring_zones_poll, timeout=timeout,
                 period=period, target_alias=target_alias,
                 target_hostname=target_hostname,
@@ -1006,7 +1006,8 @@ class CloudMonitorClient(BaseClient):
             max
         """
         return self._entity_manager.get_metric_data_points(entity, check,
-                start, end, points=points, resolution=resolution, stats=stats)
+                metric, start, end, points=points, resolution=resolution,
+                stats=stats)
 
 
     def list_notifications(self):
@@ -1018,7 +1019,7 @@ class CloudMonitorClient(BaseClient):
         """
         Returns the CloudMonitorNotification object for the specified ID.
         """
-        return self._notification_manager.get( notification_id)
+        return self._notification_manager.get(notification_id)
 
 
     def test_notification(self, notification=None, notification_type=None,
@@ -1086,7 +1087,14 @@ class CloudMonitorClient(BaseClient):
         """
         Returns the CloudMonitorNotificationPlan object for the specified ID.
         """
-        return self._notification_plan_manager.get( notification_plan_id)
+        return self._notification_plan_manager.get(notification_plan_id)
+
+
+    def delete_notification_plan(self, notification_plan):
+        """
+        Deletes the specified notification plan.
+        """
+        return self._notification_plan_manager.delete(notification_plan)
 
 
     def create_alarm(self, entity, check, notification_plan, criteria=None,
@@ -1106,7 +1114,8 @@ class CloudMonitorClient(BaseClient):
         Updates an existing alarm on the given entity.
         """
         return self._entity_manager.update_alarm(entity, alarm,
-                disabled=disabled, label=label, name=name, metadata=metadata)
+                criteria=criteria, disabled=disabled, label=label, name=name,
+                metadata=metadata)
 
 
     def list_alarms(self, entity):

@@ -11,7 +11,11 @@ from mock import MagicMock as Mock
 import pyrax.cloudnetworks
 from pyrax.cloudmonitoring import CloudMonitorAlarm
 from pyrax.cloudmonitoring import CloudMonitorCheck
+from pyrax.cloudmonitoring import CloudMonitorCheckType
+from pyrax.cloudmonitoring import CloudMonitorNotification
+from pyrax.cloudmonitoring import CloudMonitorNotificationPlan
 from pyrax.cloudmonitoring import CloudMonitorNotificationType
+from pyrax.cloudmonitoring import CloudMonitorZone
 from pyrax.cloudmonitoring import _params_to_dict
 
 import pyrax.exceptions as exc
@@ -698,6 +702,756 @@ class CloudMonitoringTest(unittest.TestCase):
         ret = mgr.delete_alarm(ent, id_)
         exp_uri = "/%s/%s/alarms/%s" % (mgr.uri_base, ent.id, id_)
         clt.method_delete.assert_called_once_with(exp_uri)
+
+    def test_check(self):
+        ent = self.entity
+        clt = self.client
+        mgr = clt._entity_manager
+        mgr.get = Mock(return_value=ent)
+        id_ = utils.random_name()
+        chk = CloudMonitorCheck(mgr, info={"id": id_}, entity="fake")
+        self.assertEqual(chk.manager, mgr)
+        self.assertEqual(chk.id, id_)
+        self.assertEqual(chk.entity, ent)
+
+    def test_check_name(self):
+        ent = self.entity
+        clt = self.client
+        mgr = clt._entity_manager
+        id_ = utils.random_name()
+        chk = CloudMonitorCheck(mgr, info={"id": id_}, entity=ent)
+        nm = utils.random_name()
+        chk.label = nm
+        self.assertEqual(chk.name, nm)
+
+    def test_check_get_reload(self):
+        ent = self.entity
+        clt = self.client
+        mgr = clt._entity_manager
+        id_ = utils.random_name()
+        chk = CloudMonitorCheck(mgr, info={"id": id_}, entity=ent)
+        info = chk._info
+        mgr.get_check = Mock(return_value=chk)
+        chk.reload()
+        self.assertEqual(chk._info, info)
+
+    def test_check_update(self):
+        ent = self.entity
+        clt = self.client
+        mgr = clt._entity_manager
+        id_ = utils.random_name()
+        chk = CloudMonitorCheck(mgr, info={"id": id_}, entity=ent)
+        mgr.update_check = Mock()
+        label = utils.random_name()
+        name = utils.random_name()
+        check_type = utils.random_name()
+        disabled = utils.random_name()
+        metadata = utils.random_name()
+        monitoring_zones_poll = utils.random_name()
+        timeout = utils.random_name()
+        period = utils.random_name()
+        target_alias = utils.random_name()
+        target_hostname = utils.random_name()
+        target_receiver = utils.random_name()
+        chk.update(label=label, name=name, disabled=disabled,
+                metadata=metadata, monitoring_zones_poll=monitoring_zones_poll,
+                timeout=timeout, period=period, target_alias=target_alias,
+                target_hostname=target_hostname,
+                target_receiver=target_receiver)
+        mgr.update_check.assert_called_once_with(chk, label=label, name=name,
+                disabled=disabled, metadata=metadata,
+                monitoring_zones_poll=monitoring_zones_poll, timeout=timeout,
+                period=period, target_alias=target_alias,
+                target_hostname=target_hostname,
+                target_receiver=target_receiver)
+
+    def test_check_delete(self):
+        ent = self.entity
+        clt = self.client
+        mgr = clt._entity_manager
+        id_ = utils.random_name()
+        chk = CloudMonitorCheck(mgr, info={"id": id_}, entity=ent)
+        mgr.delete_check = Mock()
+        chk.delete()
+        mgr.delete_check.assert_called_once_with(ent, chk)
+
+    def test_check_list_metrics(self):
+        ent = self.entity
+        clt = self.client
+        mgr = clt._entity_manager
+        id_ = utils.random_name()
+        chk = CloudMonitorCheck(mgr, info={"id": id_}, entity=ent)
+        mgr.list_metrics = Mock()
+        chk.list_metrics()
+        mgr.list_metrics.assert_called_once_with(ent, chk)
+
+    def test_check_get_metric_data_points(self):
+        ent = self.entity
+        clt = self.client
+        mgr = clt._entity_manager
+        id_ = utils.random_name()
+        chk = CloudMonitorCheck(mgr, info={"id": id_}, entity=ent)
+        mgr.get_metric_data_points = Mock()
+        metric = utils.random_name()
+        start = utils.random_name()
+        end = utils.random_name()
+        points = utils.random_name()
+        resolution = utils.random_name()
+        stats = utils.random_name()
+        chk.get_metric_data_points(metric, start, end, points=points,
+                resolution=resolution, stats=stats)
+        mgr.get_metric_data_points.assert_called_once_with(ent, chk, metric,
+                start, end, points=points, resolution=resolution, stats=stats)
+
+    def test_check_create_alarm(self):
+        ent = self.entity
+        clt = self.client
+        mgr = clt._entity_manager
+        id_ = utils.random_name()
+        chk = CloudMonitorCheck(mgr, info={"id": id_}, entity=ent)
+        mgr.create_alarm = Mock()
+        notification_plan = utils.random_name()
+        criteria = utils.random_name()
+        disabled = utils.random_name()
+        label = utils.random_name()
+        name = utils.random_name()
+        metadata = utils.random_name()
+        chk.create_alarm(notification_plan, criteria=criteria,
+                disabled=disabled, label=label, name=name, metadata=metadata)
+        mgr.create_alarm.assert_called_once_with(ent, chk, notification_plan,
+                criteria=criteria, disabled=disabled, label=label, name=name,
+                metadata=metadata)
+
+    def test_checktype_field_names(self):
+        ent = self.entity
+        clt = self.client
+        mgr = clt._entity_manager
+        id_ = utils.random_name()
+        flds = [{"optional": True, "name": "fake_opt",
+                "description": "Optional Field"},
+                {"optional": False, "name": "fake_req",
+                "description": "Required Field"}]
+        ctyp = CloudMonitorCheckType(mgr, info={"id": id_, "fields": flds})
+        self.assertEqual(ctyp.field_names, ["fake_opt", "fake_req"])
+        self.assertEqual(ctyp.required_field_names, ["fake_req"])
+        self.assertEqual(ctyp.optional_field_names, ["fake_opt"])
+
+    def test_zone_name(self):
+        ent = self.entity
+        clt = self.client
+        mgr = clt._entity_manager
+        id_ = utils.random_name()
+        nm = utils.random_name()
+        cmz = CloudMonitorZone(mgr, info={"id": id_, "label": nm})
+        self.assertEqual(cmz.label, nm)
+        self.assertEqual(cmz.name, nm)
+
+    def test_notification_name(self):
+        ent = self.entity
+        clt = self.client
+        mgr = clt._entity_manager
+        id_ = utils.random_name()
+        nm = utils.random_name()
+        cnot = CloudMonitorNotification(mgr, info={"id": id_, "label": nm})
+        self.assertEqual(cnot.label, nm)
+        self.assertEqual(cnot.name, nm)
+
+    def test_notification_update(self):
+        ent = self.entity
+        clt = self.client
+        mgr = clt._entity_manager
+        id_ = utils.random_name()
+        nm = utils.random_name()
+        details = utils.random_name()
+        cnot = CloudMonitorNotification(mgr, info={"id": id_, "label": nm})
+        mgr.update_notification = Mock()
+        cnot.update(details)
+        mgr.update_notification.assert_called_once_with(cnot, details)
+
+    def test_notification_type_name(self):
+        ent = self.entity
+        clt = self.client
+        mgr = clt._entity_manager
+        id_ = utils.random_name()
+        nm = utils.random_name()
+        cntyp = CloudMonitorNotificationType(mgr, info={"id": id_, "label": nm})
+        self.assertEqual(cntyp.label, nm)
+        self.assertEqual(cntyp.name, nm)
+
+    def test_notification_plan_name(self):
+        ent = self.entity
+        clt = self.client
+        mgr = clt._entity_manager
+        id_ = utils.random_name()
+        nm = utils.random_name()
+        cpln = CloudMonitorNotificationPlan(mgr, info={"id": id_, "label": nm})
+        self.assertEqual(cpln.label, nm)
+        self.assertEqual(cpln.name, nm)
+
+    def test_alarm(self):
+        ent = self.entity
+        clt = self.client
+        mgr = clt._entity_manager
+        id_ = utils.random_name()
+        nm = utils.random_name()
+        mgr.get = Mock(return_value=ent)
+        alm = CloudMonitorAlarm(mgr, info={"id": id_, "label": nm},
+                entity="fake")
+        self.assertEqual(alm.entity, ent)
+
+    def test_alarm_name(self):
+        ent = self.entity
+        clt = self.client
+        mgr = clt._entity_manager
+        id_ = utils.random_name()
+        nm = utils.random_name()
+        alm = CloudMonitorAlarm(mgr, info={"id": id_, "label": nm},
+                entity=ent)
+        self.assertEqual(alm.label, nm)
+        self.assertEqual(alm.name, nm)
+
+    def test_alarm_update(self):
+        ent = self.entity
+        clt = self.client
+        mgr = clt._entity_manager
+        id_ = utils.random_name()
+        nm = utils.random_name()
+        alm = CloudMonitorAlarm(mgr, info={"id": id_, "label": nm},
+                entity=ent)
+        criteria = utils.random_name()
+        disabled = utils.random_name()
+        label = utils.random_name()
+        name = utils.random_name()
+        metadata = utils.random_name()
+        ent.update_alarm = Mock()
+        alm.update(criteria=criteria, disabled=disabled, label=label,
+                name=name, metadata=metadata)
+        ent.update_alarm.assert_called_once_with(alm, criteria=criteria,
+                disabled=disabled, label=label, name=name, metadata=metadata)
+
+    def test_alarm_get_reload(self):
+        ent = self.entity
+        clt = self.client
+        mgr = clt._entity_manager
+        id_ = utils.random_name()
+        nm = utils.random_name()
+        alm = CloudMonitorAlarm(mgr, info={"id": id_, "label": nm},
+                entity=ent)
+        info = alm._info
+        ent.get_alarm = Mock(return_value=alm)
+        alm.reload()
+        self.assertEqual(alm._info, info)
+
+    def test_clt_get_account(self):
+        clt = self.client
+        rsp = utils.random_name()
+        rb = utils.random_name()
+        clt.method_get = Mock(return_value=((rsp, rb)))
+        ret = clt.get_account()
+        clt.method_get.assert_called_once_with("/account")
+        self.assertEqual(ret, rb)
+
+    def test_clt_get_limits(self):
+        clt = self.client
+        rsp = utils.random_name()
+        rb = utils.random_name()
+        clt.method_get = Mock(return_value=((rsp, rb)))
+        ret = clt.get_limits()
+        clt.method_get.assert_called_once_with("/limits")
+        self.assertEqual(ret, rb)
+
+    def test_clt_get_audits(self):
+        clt = self.client
+        rsp = utils.random_name()
+        rb = utils.random_name()
+        clt.method_get = Mock(return_value=((rsp, {"values": rb})))
+        ret = clt.get_audits()
+        clt.method_get.assert_called_once_with("/audits")
+        self.assertEqual(ret, rb)
+
+    def test_clt_list_entities(self):
+        clt = self.client
+        ents = utils.random_name()
+        clt._entity_manager.list = Mock(return_value=ents)
+        ret = clt.list_entities()
+        clt._entity_manager.list.assert_called_once_with()
+        self.assertEqual(ret, ents)
+
+    def test_clt_get_entity(self):
+        clt = self.client
+        ent = self.entity
+        clt._entity_manager.get = Mock(return_value=ent)
+        ret = clt.get_entity(ent)
+        clt._entity_manager.get.assert_called_once_with(ent)
+        self.assertEqual(ret, ent)
+
+    def test_clt_create_entity(self):
+        clt = self.client
+        ent = self.entity
+        mgr = clt._entity_manager
+        obj_id = utils.random_name()
+        resp = {"status": "201", "x-object-id": obj_id}
+        mgr.create = Mock(return_value=resp)
+        clt.get_entity = Mock(return_value=ent)
+        label = utils.random_name()
+        name = utils.random_name()
+        agent = utils.random_name()
+        ip_addresses = utils.random_name()
+        metadata = utils.random_name()
+        ret = clt.create_entity(label=label, name=name, agent=agent,
+                ip_addresses=ip_addresses, metadata=metadata)
+        mgr.create.assert_called_once_with(label=label, name=name, agent=agent,
+                ip_addresses=ip_addresses, metadata=metadata,
+                return_response=True)
+        clt.get_entity.assert_called_once_with(obj_id)
+        self.assertEqual(ret, ent)
+
+    def test_clt_update_entity(self):
+        clt = self.client
+        ent = self.entity
+        mgr = clt._entity_manager
+        obj_id = utils.random_name()
+        mgr.update_entity = Mock()
+        agent = utils.random_name()
+        metadata = utils.random_name()
+        clt.update_entity(ent, agent=agent, metadata=metadata)
+        mgr.update_entity.assert_called_once_with(ent, agent=agent,
+                metadata=metadata)
+
+    def test_clt_delete_entity(self):
+        clt = self.client
+        ent = self.entity
+        mgr = clt._entity_manager
+        mgr.delete = Mock()
+        clt.delete_entity(ent)
+        mgr.delete.assert_called_once_with(ent)
+
+    def test_clt_list_check_types(self):
+        clt = self.client
+        ent = self.entity
+        mgr = clt._check_type_manager
+        cts = utils.random_name()
+        mgr.list = Mock(return_value=cts)
+        ret = clt.list_check_types()
+        mgr.list.assert_called_once_with()
+        self.assertEqual(ret, cts)
+
+    def test_clt_get_check_type(self):
+        clt = self.client
+        ent = self.entity
+        mgr = clt._check_type_manager
+        ct = utils.random_name()
+        mgr.get = Mock(return_value=ct)
+        ret = clt.get_check_type("fake")
+        mgr.get.assert_called_once_with("fake")
+        self.assertEqual(ret, ct)
+
+    def test_clt_list_checks(self):
+        clt = self.client
+        ent = self.entity
+        mgr = clt._entity_manager
+        chks = utils.random_name()
+        mgr.list_checks = Mock(return_value=chks)
+        ret = clt.list_checks(ent)
+        mgr.list_checks.assert_called_once_with(ent)
+        self.assertEqual(ret, chks)
+
+    def test_clt_create_check(self):
+        clt = self.client
+        ent = self.entity
+        mgr = clt._entity_manager
+        label = utils.random_name()
+        name = utils.random_name()
+        check_type = utils.random_name()
+        disabled = utils.random_name()
+        metadata = utils.random_name()
+        details = utils.random_name()
+        monitoring_zones_poll = utils.random_name()
+        timeout = utils.random_name()
+        period = utils.random_name()
+        target_alias = utils.random_name()
+        target_hostname = utils.random_name()
+        target_receiver = utils.random_name()
+        rand_bool = random.choice((True, False))
+        answer = utils.random_name()
+        mgr.create_check = Mock(return_value=answer)
+        ret = clt.create_check(ent, label=label, name=name,
+                check_type=check_type, disabled=disabled, metadata=metadata,
+                details=details, monitoring_zones_poll=monitoring_zones_poll,
+                timeout=timeout, period=period, target_alias=target_alias,
+                target_hostname=target_hostname,
+                target_receiver=target_receiver, test_only=rand_bool,
+                include_debug=rand_bool)
+        mgr.create_check.assert_called_once_with(ent, label=label, name=name,
+                check_type=check_type, disabled=disabled, metadata=metadata,
+                details=details, monitoring_zones_poll=monitoring_zones_poll,
+                timeout=timeout, period=period, target_alias=target_alias,
+                target_hostname=target_hostname,
+                target_receiver=target_receiver, test_only=rand_bool,
+                include_debug=rand_bool)
+        self.assertEqual(ret, answer)
+
+    def test_clt_get_check(self):
+        clt = self.client
+        ent = self.entity
+        mgr = clt._entity_manager
+        answer = utils.random_name()
+        chk = utils.random_name()
+        mgr.get_check = Mock(return_value=answer)
+        ret = clt.get_check(ent, chk)
+        mgr.get_check.assert_called_once_with(ent, chk)
+        self.assertEqual(ret, answer)
+
+    def test_clt_find_all_checks(self):
+        clt = self.client
+        ent = self.entity
+        mgr = clt._entity_manager
+        answer = utils.random_name()
+        mgr.find_all_checks = Mock(return_value=answer)
+        ret = clt.find_all_checks(ent, foo="fake", bar="fake")
+        mgr.find_all_checks.assert_called_once_with(ent, foo="fake", bar="fake")
+        self.assertEqual(ret, answer)
+
+    def test_clt_update_check(self):
+        clt = self.client
+        ent = self.entity
+        mgr = clt._entity_manager
+        chk = utils.random_name()
+        label = utils.random_name()
+        name = utils.random_name()
+        disabled = utils.random_name()
+        metadata = utils.random_name()
+        monitoring_zones_poll = utils.random_name()
+        timeout = utils.random_name()
+        period = utils.random_name()
+        target_alias = utils.random_name()
+        target_hostname = utils.random_name()
+        target_receiver = utils.random_name()
+        mgr.update_check = Mock()
+        clt.update_check(ent, chk, label=label, name=name, disabled=disabled,
+                metadata=metadata, monitoring_zones_poll=monitoring_zones_poll,
+                timeout=timeout, period=period, target_alias=target_alias,
+                target_hostname=target_hostname,
+                target_receiver=target_receiver)
+        mgr.update_check.assert_called_once_with(ent, chk, label=label,
+                name=name, disabled=disabled, metadata=metadata,
+                monitoring_zones_poll=monitoring_zones_poll, timeout=timeout,
+                period=period, target_alias=target_alias,
+                target_hostname=target_hostname,
+                target_receiver=target_receiver)
+
+    def test_clt_delete_check(self):
+        clt = self.client
+        ent = self.entity
+        mgr = clt._entity_manager
+        chk = utils.random_name()
+        mgr.delete_check = Mock()
+        clt.delete_check(ent, chk)
+        mgr.delete_check.assert_called_once_with(ent, chk)
+
+    def test_clt_list_metrics(self):
+        clt = self.client
+        ent = self.entity
+        mgr = clt._entity_manager
+        chk = utils.random_name()
+        answer = utils.random_name()
+        mgr.list_metrics = Mock(return_value=answer)
+        ret = clt.list_metrics(ent, chk)
+        mgr.list_metrics.assert_called_once_with(ent, chk)
+        self.assertEqual(ret, answer)
+
+    def test_clt_get_metric_data_points(self):
+        clt = self.client
+        ent = self.entity
+        mgr = clt._entity_manager
+        chk = utils.random_name()
+        answer = utils.random_name()
+        mgr.get_metric_data_points = Mock(return_value=answer)
+        metric = utils.random_name()
+        start = utils.random_name()
+        end = utils.random_name()
+        points = utils.random_name()
+        resolution = utils.random_name()
+        stats = utils.random_name()
+        ret = clt.get_metric_data_points(ent, chk, metric, start, end,
+                points=points, resolution=resolution, stats=stats)
+        mgr.get_metric_data_points.assert_called_once_with(ent, chk, metric,
+                start, end, points=points, resolution=resolution, stats=stats)
+        self.assertEqual(ret, answer)
+
+    def test_clt_list_notifications(self):
+        clt = self.client
+        ent = self.entity
+        mgr = clt._notification_manager
+        answer = utils.random_name()
+        mgr.list = Mock(return_value=answer)
+        ret = clt.list_notifications()
+        mgr.list.assert_called_once_with()
+        self.assertEqual(ret, answer)
+
+    def test_clt_get_notification(self):
+        clt = self.client
+        ent = self.entity
+        mgr = clt._notification_manager
+        answer = utils.random_name()
+        notif_id = utils.random_name()
+        mgr.get = Mock(return_value=answer)
+        ret = clt.get_notification(notif_id)
+        mgr.get.assert_called_once_with(notif_id)
+        self.assertEqual(ret, answer)
+
+    def test_clt_test_notification(self):
+        clt = self.client
+        ent = self.entity
+        mgr = clt._notification_manager
+        answer = utils.random_name()
+        mgr.test_notification = Mock(return_value=answer)
+        notification = utils.random_name()
+        ntyp = utils.random_name()
+        details = utils.random_name()
+        ret = clt.test_notification(notification=notification,
+                notification_type=ntyp, details=details)
+        mgr.test_notification.assert_called_once_with(notification=notification,
+                notification_type=ntyp, details=details)
+        self.assertEqual(ret, answer)
+
+    def test_clt_create_notification(self):
+        clt = self.client
+        ent = self.entity
+        mgr = clt._notification_manager
+        answer = utils.random_name()
+        mgr.create = Mock(return_value=answer)
+        ntyp = utils.random_name()
+        label = utils.random_name()
+        name = utils.random_name()
+        details = utils.random_name()
+        ret = clt.create_notification(ntyp, label=label, name=name,
+                details=details)
+        mgr.create.assert_called_once_with(ntyp, label=label, name=name,
+                details=details)
+        self.assertEqual(ret, answer)
+
+    def test_clt_update_notification(self):
+        clt = self.client
+        ent = self.entity
+        mgr = clt._notification_manager
+        answer = utils.random_name()
+        mgr.update_notification = Mock(return_value=answer)
+        notification = utils.random_name()
+        details = utils.random_name()
+        ret = clt.update_notification(notification, details)
+        mgr.update_notification.assert_called_once_with(notification, details)
+        self.assertEqual(ret, answer)
+
+    def test_clt_delete_notification(self):
+        clt = self.client
+        ent = self.entity
+        mgr = clt._notification_manager
+        answer = utils.random_name()
+        mgr.delete= Mock(return_value=answer)
+        notification = utils.random_name()
+        ret = clt.delete_notification(notification)
+        mgr.delete.assert_called_once_with(notification)
+        self.assertEqual(ret, answer)
+
+    def test_clt_create_notification_plan(self):
+        clt = self.client
+        ent = self.entity
+        mgr = clt._notification_plan_manager
+        answer = utils.random_name()
+        mgr.create = Mock(return_value=answer)
+        label = utils.random_name()
+        name = utils.random_name()
+        critical_state = utils.random_name()
+        ok_state = utils.random_name()
+        warning_state = utils.random_name()
+        ret = clt.create_notification_plan(label=label, name=name,
+                critical_state=critical_state, ok_state=ok_state,
+                warning_state=warning_state)
+        mgr.create.assert_called_once_with(label=label, name=name,
+                critical_state=critical_state, ok_state=ok_state,
+                warning_state=warning_state)
+        self.assertEqual(ret, answer)
+
+    def test_clt_list_notification_plans(self):
+        clt = self.client
+        ent = self.entity
+        mgr = clt._notification_plan_manager
+        answer = utils.random_name()
+        mgr.list = Mock(return_value=answer)
+        ret = clt.list_notification_plans()
+        mgr.list.assert_called_once_with()
+        self.assertEqual(ret, answer)
+
+    def test_clt_get_notification_plan(self):
+        clt = self.client
+        ent = self.entity
+        mgr = clt._notification_plan_manager
+        answer = utils.random_name()
+        nplan_id = utils.random_name()
+        mgr.get = Mock(return_value=answer)
+        ret = clt.get_notification_plan(nplan_id)
+        mgr.get.assert_called_once_with(nplan_id)
+        self.assertEqual(ret, answer)
+
+    def test_clt_delete_notification_plan(self):
+        clt = self.client
+        ent = self.entity
+        mgr = clt._notification_plan_manager
+        answer = utils.random_name()
+        mgr.delete= Mock(return_value=answer)
+        notification_plan = utils.random_name()
+        ret = clt.delete_notification_plan(notification_plan)
+        mgr.delete.assert_called_once_with(notification_plan)
+        self.assertEqual(ret, answer)
+
+    def test_clt_list_alarms(self):
+        clt = self.client
+        ent = self.entity
+        mgr = clt._entity_manager
+        alms = utils.random_name()
+        mgr.list_alarms = Mock(return_value=alms)
+        ret = clt.list_alarms(ent)
+        mgr.list_alarms.assert_called_once_with(ent)
+        self.assertEqual(ret, alms)
+
+    def test_clt_get_alarm(self):
+        clt = self.client
+        ent = self.entity
+        mgr = clt._entity_manager
+        answer = utils.random_name()
+        alm = utils.random_name()
+        mgr.get_alarm = Mock(return_value=answer)
+        ret = clt.get_alarm(ent, alm)
+        mgr.get_alarm.assert_called_once_with(ent, alm)
+        self.assertEqual(ret, answer)
+
+    def test_clt_create_alarm(self):
+        clt = self.client
+        ent = self.entity
+        mgr = clt._entity_manager
+        chk = utils.random_name()
+        nplan = utils.random_name()
+        criteria = utils.random_name()
+        disabled = utils.random_name()
+        label = utils.random_name()
+        name = utils.random_name()
+        metadata = utils.random_name()
+        answer = utils.random_name()
+        mgr.create_alarm = Mock(return_value=answer)
+        ret = clt.create_alarm(ent, chk, nplan, criteria=criteria,
+                disabled=disabled, label=label, name=name, metadata=metadata)
+        mgr.create_alarm.assert_called_once_with(ent, chk, nplan,
+                criteria=criteria, disabled=disabled, label=label, name=name,
+                metadata=metadata)
+        self.assertEqual(ret, answer)
+
+    def test_clt_update_alarm(self):
+        clt = self.client
+        ent = self.entity
+        mgr = clt._entity_manager
+        alm = utils.random_name()
+        criteria = utils.random_name()
+        disabled = utils.random_name()
+        label = utils.random_name()
+        name = utils.random_name()
+        metadata = utils.random_name()
+        answer = utils.random_name()
+        mgr.update_alarm = Mock(return_value=answer)
+        ret = clt.update_alarm(ent, alm, criteria=criteria, disabled=disabled,
+                label=label, name=name, metadata=metadata)
+        mgr.update_alarm.assert_called_once_with(ent, alm, criteria=criteria,
+                disabled=disabled, label=label, name=name, metadata=metadata)
+        self.assertEqual(ret, answer)
+
+    def test_clt_delete_alarm(self):
+        clt = self.client
+        ent = self.entity
+        mgr = clt._entity_manager
+        alm = utils.random_name()
+        mgr.delete_alarm = Mock()
+        clt.delete_alarm(ent, alm)
+        mgr.delete_alarm.assert_called_once_with(ent, alm)
+
+    def test_clt_list_notification_types(self):
+        clt = self.client
+        ent = self.entity
+        mgr = clt._notification_manager
+        typs = utils.random_name()
+        mgr.list_types = Mock(return_value=typs)
+        ret = clt.list_notification_types()
+        mgr.list_types.assert_called_once_with()
+        self.assertEqual(ret, typs)
+
+    def test_clt_get_notification_type(self):
+        clt = self.client
+        ent = self.entity
+        mgr = clt._notification_manager
+        answer = utils.random_name()
+        nt_id = utils.random_name()
+        mgr.get_type = Mock(return_value=answer)
+        ret = clt.get_notification_type(nt_id)
+        mgr.get_type.assert_called_once_with(nt_id)
+        self.assertEqual(ret, answer)
+
+    def test_clt_list_monitoring_zones(self):
+        clt = self.client
+        ent = self.entity
+        mgr = clt._monitoring_zone_manager
+        typs = utils.random_name()
+        mgr.list= Mock(return_value=typs)
+        ret = clt.list_monitoring_zones()
+        mgr.list.assert_called_once_with()
+        self.assertEqual(ret, typs)
+
+    def test_clt_get_monitoring_zone(self):
+        clt = self.client
+        ent = self.entity
+        mgr = clt._monitoring_zone_manager
+        answer = utils.random_name()
+        mz_id = utils.random_name()
+        mgr.get= Mock(return_value=answer)
+        ret = clt.get_monitoring_zone(mz_id)
+        mgr.get.assert_called_once_with(mz_id)
+        self.assertEqual(ret, answer)
+
+    def test_clt_list(self):
+        clt = self.client
+        self.assertRaises(NotImplementedError, clt.list)
+
+    def test_clt_get(self):
+        clt = self.client
+        self.assertRaises(NotImplementedError, clt.get, "fake")
+
+    def test_clt_create(self):
+        clt = self.client
+        self.assertRaises(NotImplementedError, clt.create)
+
+    def test_clt_delete(self):
+        clt = self.client
+        self.assertRaises(NotImplementedError, clt.delete, "fake")
+
+    def test_clt_find(self):
+        clt = self.client
+        self.assertRaises(NotImplementedError, clt.find)
+
+    def test_clt_findall(self):
+        clt = self.client
+        self.assertRaises(NotImplementedError, clt.findall)
+
+    def test_clt_create_body(self):
+        clt = self.client
+        label = utils.random_name()
+        name = utils.random_name()
+        agent = utils.random_name()
+        ip_addresses = utils.random_name()
+        metadata = utils.random_name()
+        expected = {"label": label, "ip_addresses": ip_addresses,
+                "agent_id": agent, "metadata": metadata}
+        ret = clt._create_body(name, label=label, agent=agent,
+                ip_addresses=ip_addresses, metadata=metadata)
+        self.assertEqual(ret, expected)
+
 
 
 if __name__ == "__main__":
