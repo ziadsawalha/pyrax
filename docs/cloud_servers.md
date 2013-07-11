@@ -140,6 +140,16 @@ You can do something similar to get the 512MB flavor:
 
 Note that these calls are somewhat inefficient, so if you are going to be working with images and flavors a lot, it is best to make the listing call once and store the results locally. Images and flavors typically do not change very often.
 
+## SSH Key Authentication
+The default method for authenticating to a server is by supplying a username/password combination. However, when using SSH to connect to a Linux server, it is generally preferable to authenticate using an SSH key.
+
+You can store your public key on the API server, giving it a name that can be used to identify it when creating a server. Here is an example of storing your key:
+
+    with open(os.path.expanduser("~/.ssh/id_rsa.pub")) as keyfile:
+        cs.keypairs.create("my_key", keyfile.read())
+
+The first line above assumes that your public key is named "**id_rsa.pub**", and is located in the "**.ssh**" folder inside your home directory. This is a typical case; if your file location differs, change the path accordingly. After the above code executes, your key will be saved in your account, and you can reference by the name you gave it; in this case, "**my_key**".
+
 ## Creating a Server
 Now that you have the image and flavor objects you want (actually, it's their `id` attributes you really need), you are ready to create your new cloud server! To do this, call the `create()` method, passing in the name you want to give to the new server, along with the IDs for the desired image and flavor.
 
@@ -163,7 +173,7 @@ Wait - the server has no network addresses? How useful is that? How are you supp
 
 If you ran that code, you noticed that it returned almost immediately. What happened is that the cloud API recorded your request, and returned as much information as it could about the server that it was *going to create*. The networking for the server had not yet been created, so it could not provide that information.
 
-One important piece of information is the __adminPass__ – without that, you will not be able to log into your server. It is *only* supplied with the `Server` object returned from the initial `create()` request. After that you can no longer retrieve it. Note: if this does happen, you can call the `change_password()` method of the `Server` object to set a new root password on the server.
+One important piece of information is the __adminPass__ – without that, you will not be able to log into your server. It is *only* supplied with the `Server` object returned from the initial `create()` request. After that, future calls to `get()` the server will not return that value. Note: if this does happen, you can call the `change_password()` method of the `Server` object to set a new root password on the server.
 
 This brings up an important point: the `Server` objects you get back are essentially snapshots of that server at the moment you requested the information. Your object's 'BUILD' status won't change no matter how long you wait. You will have to refresh it to see any changes. In other words, these objects are not dynamic. Fortunately, refreshing the object is simple enough to do:
 
@@ -181,8 +191,7 @@ This should return something like:
 Since you can't do anything with your new server until it finishes building, it would be helpful to have a way of determining when the build is complete. So `pyrax` includes the `wait_until()` method in its `utils` module. Here is a typical usage:
 
     srv = cs.servers.create(…)
-    new_srv = pyrax.utils.wait_until(srv, "status",
-            ["ACTIVE", "ERROR"], attempts=0)
+    new_srv = pyrax.utils.wait_until(srv, "status", ["ACTIVE", "ERROR"])
 
 When you run the above code, execution will block until the server's status reaches one of the two values in the list. Note that we just don't want to check for "ACTIVE" status, since server creation can fail, and the `wait_until()` call will wait forever.
 
@@ -194,12 +203,26 @@ Another common use case is when you are creating several servers, and you don't 
 | ---- | ---- | ---- |
 | obj | Yes | The object to examine. |
 | att | Yes | The name of the attribute of the object to examine. |
-| desired | Yes | The desired value(s) of the attribute. |
-| callback | No | An optional function that will be called when the `wait_until()` process completes. Providing the callback makes wait_until() non-blocking. The callback function should accept a single parameter: the updated version of the object. |
-| interval | No | How long (in seconds) to wait between checking the object for changes in the target attribute. |
-| attempts | No | How many times should wait_until() check the object before giving up? Passing `attempts=0` will cause `wait_until()` to loop until the desired attribute value is reached. |
-| verbose | No | When True, each attempt will print out the current value of the watched attribute and the time that has elapsed since the original request. Note that if a callback function is specified, the value of `verbose` is ignored; all print output is suppressed. |
-| verbose_atts | No | A list of additional attributes whose values will be printed out for each attempt. If `verbose=False`, this parameter has no effect. |
+| desired | Yes | The desired value(s) of the attribute that the method will wait for. |
+| callback | No | An optional function that will be called when the `wait_until()` process completes. Providing the callback makes wait_until() non-blocking. The callback function should accept a single parameter: the updated version of the object. Default = `None` |
+| interval | No | How long (in seconds) to wait between polling the API for changes in the target object's attribute. Default = `5` seconds.|
+| attempts | No | How many times should wait_until() check the object before giving up? Passing `attempts=0` will cause `wait_until()` to loop until the desired attribute value is reached. Default = `0`, meaning that `wait_until()` will loop indefinitely. |
+| verbose | No | When True, each attempt will print out the current value of the watched attribute and the time that has elapsed since the original request. Note that if a callback function is specified, the value of `verbose` is ignored; all print output is suppressed. Default = `False` |
+| verbose_atts | No | A list of additional attributes whose values will be printed out for each attempt. If `verbose=False`, this parameter has no effect. Default = `None` |
+
+### Even Easier: `wait_for_build()`
+Since waiting for servers (as well as databases and load balancers) to build is such a common use case, pyrax provides a convenience method that provides the most common default values for `wait_until()`. So assuming that you have a reference `srv` to a newly-created server, you can call:
+
+    wait_for_build(srv)
+
+and this would be equivalent to the call:
+
+    wait_until(srv, "status", ["ACTIVE", "ERROR"], interval=20, callback=None,
+            attempts=0, verbose=False, verbose_atts="progress")
+
+You can override any of these defaults in the call to `wait_for_build()`. For example, if you want verbose output, you would call:
+
+    wait_for_build(srv, verbose=True)
 
 
 ### Additional Parameters to Create()

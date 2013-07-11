@@ -343,6 +343,7 @@ def _wait_until(obj, att, desired, callback, interval, attempts, verbose,
     return obj
 
 
+
 def wait_for_build(obj, att=None, desired=None, callback=None, interval=None,
         attempts=None, verbose=None, verbose_atts=None):
     """
@@ -358,6 +359,7 @@ def wait_for_build(obj, att=None, desired=None, callback=None, interval=None,
     verbose_atts = verbose_atts or "progress"
     return wait_until(obj, att, desired, callback=callback, interval=interval,
             attempts=attempts, verbose=verbose, verbose_atts=verbose_atts)
+
 
 def _parse_datetime_string(val):
     """
