@@ -1,4 +1,4 @@
-# Cloud DNS
+# Cloud Monitoring
 
 ## Basic Concepts
 Rackspace Cloud Monitoring provides timely and accurate information about how your resources are performing. It supplies you with key information that can help you manage your business by enabling you to keep track of your cloud resources and receive instant notification when a resource needs your attention. You can quickly create multiple monitors with predefined checks, such as PING, HTTPS, SMTP, and many others.
