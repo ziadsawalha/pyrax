@@ -131,6 +131,8 @@ class IdentityTest(unittest.TestCase):
         token = utils.random_name()
 
         class FakeResp(object):
+            info = None
+
             def json(self):
                 return self.info
 

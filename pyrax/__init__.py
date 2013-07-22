@@ -19,7 +19,7 @@
 
 # For doxygen class doc generation:
 """
-\mainpage Class Documenation for pyrax
+\mainpage Class Documentation for pyrax
 
 This module provides the Python Language Bindings for creating applications
 built on the Rackspace / OpenStack Cloud.<br />
@@ -503,6 +503,17 @@ def authenticate(connect=True):
     will skip the service connection step.
     """
     _auth_and_connect(connect=connect)
+
+
+def plug_hole_in_swiftclient_auth(clt, url):
+    """
+    This is necessary because swiftclient has an issue when a token expires and
+    it needs to re-authenticate against Rackspace auth. It is a temporary
+    workaround until we can fix swiftclient.
+    """
+    conn = clt.connection
+    conn.token = identity.token
+    conn.url = url
 
 
 def clear_credentials():

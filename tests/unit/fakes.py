@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import json
+import os
 import uuid
 
+import pyrax
 from pyrax.cf_wrapper.client import FolderUploader
 from pyrax.cf_wrapper.container import Container
 from pyrax.cf_wrapper.storage_object import StorageObject
@@ -634,3 +636,9 @@ class FakeIdentityResponse(FakeResponse):
 
     def read(self):
         return json.dumps(self.content)
+
+_module_pth = os.path.dirname(pyrax.__file__)
+_img_path = os.path.join(_module_pth, "..", "tests", "unit", "python-logo.png")
+png_file = None
+with open(_img_path, "rb") as pfile:
+    png_file = pfile.read()
