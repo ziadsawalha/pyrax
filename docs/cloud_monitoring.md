@@ -159,3 +159,37 @@ Parameter | Required? | Default | Description
 
 Note that you must supply either a `target_hostname` or a `target_alias`, but not both.
 
+## Create a Notification
+
+There are two supported notification types, `email` and `webhook`, by which you can be notified of alarms. The `create_notification()` method contains several parameters:
+
+Parameter | Required? | Default | Description
+------ | ------ | ------ | ------ 
+**notification_type** | yes | | Either "email" or "webhook"
+**label** | no | None | Friendly name for the notification
+**details** | no | None | A dictionary of details for your `notification_type`
+
+### Notification Details
+
+When the `notification_type` is "email", the `details` parameter should be a dictionary with a key "address", and a value specifying an email address.
+
+When the `notification_type` is "webhook", the `details` parameter should be a dictionary with a key "url", and a value specifying a url to POST.
+
+## Create the Notification
+
+To create the notification, run the following:
+
+    not = cm.create_notification("email", label="my_email_notification",
+            details={"address": "me@example.com")
+
+This will create an email notification, which can then be added to a Notification Plan.
+
+## Create a Notification Plan
+
+Notification Plans outline the notifications to contact under three states: ok, warning, and critical.
+
+
+
+## Create an Alarm
+
+To create the alarm, run the following:
