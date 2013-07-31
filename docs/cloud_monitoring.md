@@ -134,7 +134,7 @@ This returns a list of `CloudMonitorZone` objects:
 ## Create the Check
 To create the check, run the following:
 
-    chk = cm.create_check(ent, label="sample_check", type="remote.http",
+    chk = cm.create_check(ent, label="sample_check", check_type="remote.http",
             details={"url": "http://example.com/some_page"}, period=900,
             timeout=20, monitoring_zones_poll=["mzdfw", "mzlon", "mzsyd"],
             target_hostname="http://example.com")
@@ -179,14 +179,14 @@ When the `notification_type` is "webhook", the `details` parameter should be a d
 
 To create the notification, run the following:
 
-    not = cm.create_notification("email", label="my_email_notification",
+    email = cm.create_notification("email", label="my_email_notification",
             details={"address": "me@example.com")
 
 This will create an email notification, which can then be added to a Notification Plan.
 
 ## Create a Notification Plan
 
-Notification Plans outline the notifications to contact under three states: ok, warning, and critical.
+Notification Plans outline the specific notifications to contact under three states: ok, warning, and critical. A Notification Plan is then given to an Alarm.
 
 
 
