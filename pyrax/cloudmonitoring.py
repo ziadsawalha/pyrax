@@ -162,6 +162,8 @@ class CloudMonitorNotificationManager(BaseManager):
                 "details": details,
                 }
         resp, resp_body = self.api.method_post(uri, body=body)
+        id = resp["x-object-id"]
+        return self.get(id)
 
 
     def test_notification(self, notification=None, notification_type=None,
@@ -359,8 +361,8 @@ class CloudMonitorEntityManager(BaseManager):
                     # Info is in the 'details'
                     raise exc.InvalidMonitoringCheckDetails("Validation "
                             "failed. Error: '%s'." % dtls)
-        if test_only:
-            return resp_body
+        else:
+            return CloudMonitorCheck(self, resp, entity)
 
 
     def find_all_checks(self, entity, **kwargs):
