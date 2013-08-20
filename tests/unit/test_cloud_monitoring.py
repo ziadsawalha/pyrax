@@ -148,7 +148,9 @@ class CloudMonitoringTest(unittest.TestCase):
     def test_notif_manager_create(self):
         clt = self.client
         mgr = clt._notification_manager
-        clt.method_post = Mock(return_value=(None, None))
+        fake_resp = {"x-object-id": {}}
+        clt.method_post = Mock(return_value=(fake_resp, None))
+        mgr.get = Mock(return_value=fakes.FakeEntity)
         ntyp = utils.random_name()
         label = utils.random_name()
         name = utils.random_name()
@@ -233,7 +235,9 @@ class CloudMonitoringTest(unittest.TestCase):
     def test_notif_plan_manager_create(self):
         clt = self.client
         mgr = clt._notification_plan_manager
-        clt.method_post = Mock(return_value=(None, None))
+        fake_resp = {"x-object-id": {}}
+        clt.method_post = Mock(return_value=(fake_resp, None))
+        mgr.get = Mock(return_value=fakes.FakeEntity)
         label = utils.random_name()
         name = utils.random_name()
         crit = utils.random_name()
@@ -293,7 +297,9 @@ class CloudMonitoringTest(unittest.TestCase):
         target_receiver = utils.random_name()
         test_only = True
         include_debug = True
-        clt.method_post = Mock(return_value=(None, None))
+        fake_resp = {"x-object-id": {}}
+        clt.method_post = Mock(return_value=(fake_resp, None))
+        mgr.get = Mock(return_value=fakes.FakeEntity)
         exp_uri = "/%s/%s/test-check?debug=true" % (mgr.uri_base, ent.id)
         exp_body = {"label": label or name, "details": details,
                 "disabled": disabled, "type": check_type,
@@ -328,7 +334,9 @@ class CloudMonitoringTest(unittest.TestCase):
         target_receiver = utils.random_name()
         test_only = True
         include_debug = False
-        clt.method_post = Mock(return_value=(None, None))
+        fake_resp = {"x-object-id": {}}
+        clt.method_post = Mock(return_value=(fake_resp, None))
+        mgr.get = Mock(return_value=fakes.FakeEntity)
         exp_uri = "/%s/%s/test-check" % (mgr.uri_base, ent.id)
         exp_body = {"label": label or name, "details": details,
                 "disabled": disabled, "type": check_type,
@@ -363,7 +371,9 @@ class CloudMonitoringTest(unittest.TestCase):
         target_receiver = utils.random_name()
         test_only = False
         include_debug = False
-        clt.method_post = Mock(return_value=(None, None))
+        fake_resp = {"x-object-id": {}}
+        clt.method_post = Mock(return_value=(fake_resp, None))
+        mgr.get = Mock(return_value=fakes.FakeEntity)
         exp_uri = "/%s/%s/checks" % (mgr.uri_base, ent.id)
         exp_body = {"label": label or name, "details": details,
                 "disabled": disabled, "type": check_type,
