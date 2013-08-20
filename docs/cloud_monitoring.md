@@ -130,11 +130,10 @@ This returns a list of `CloudMonitorZone` objects:
      <CloudMonitorZone country_code=US, id=mzord, label=Chicago (ORD), source_ips=[u'2001:4801:7902:0001::/64', u'50.57.61.0/26']>,
      <CloudMonitorZone country_code=AU, id=mzsyd, label=Sydney (SYD), source_ips=[u'119.9.5.0/26', u'2401:1801:7902:1::/64']>]
 
-
 ## Create the Check
 To create the check, run the following:
 
-    chk = cm.create_check(ent, label="sample_check", type="remote.http",
+    chk = cm.create_check(ent, label="sample_check", check_type="remote.http",
             details={"url": "http://example.com/some_page"}, period=900,
             timeout=20, monitoring_zones_poll=["mzdfw", "mzlon", "mzsyd"],
             target_hostname="http://example.com")
@@ -161,35 +160,44 @@ Note that you must supply either a `target_hostname` or a `target_alias`, but no
 
 ## Create a Notification
 
-There are two supported notification types, `email` and `webhook`, by which you can be notified of alarms. The `create_notification()` method contains several parameters:
+There are three supported notification types; `email`, `webhook`, and `pagerduty`, by which you can be notified of alarms. To see the details for each type, call:
 
-Parameter | Required? | Default | Description
------- | ------ | ------ | ------ 
-**notification_type** | yes | | Either "email" or "webhook"
-**label** | no | None | Friendly name for the notification
-**details** | no | None | A dictionary of details for your `notification_type`
+    `cm.list_notification_types()`
 
-### Notification Details
+This returns a list of `CloudMonitorNotificationType` objects:
 
-When the `notification_type` is "email", the `details` parameter should be a dictionary with a key "address", and a value specifying an email address.
+    [<CloudMonitorNotificationType fields=[{u'optional': False, u'name': u'url', u'description': u'An HTTP or HTTPS URL to POST to'}], id=webhook>, <CloudMonitorNotificationType fields=[{u'optional': False, u'name': u'address', u'description': u'Email address to send notifications to'}], id=email>, <CloudMonitorNotificationType fields=[{u'optional': False, u'name': u'service_key', u'description': u'The PagerDuty service key to use.'}], id=pagerduty>]
 
-When the `notification_type` is "webhook", the `details` parameter should be a dictionary with a key "url", and a value specifying a url to POST.
+The `id` value is then passed in as the `notification_type` parameter to `create_notification()`.
+
 
 ## Create the Notification
 
 To create the notification, run the following:
 
-    not = cm.create_notification("email", label="my_email_notification",
+    email = cm.create_notification("email", label="my_email_notification",
             details={"address": "me@example.com")
 
-This will create an email notification, which can then be added to a Notification Plan.
+The `create_notification()` method contains several parameters:
 
-## Create a Notification Plan
+Parameter | Required? | Default | Description
+------ | ------ | ------ | ------ 
+**notification_type** | yes | | A `CloudMonitoringNotificationType`, or a string matching a supported type's `id` attribute
+**label** | no | None | Friendly name for the notification
+**details** | no | None | A dictionary of details for your `notification_type`
 
-Notification Plans outline the notifications to contact under three states: ok, warning, and critical.
+## Create the Notification Plan
 
+Notification Plans outline the specific notifications to contact under three conditions: ok, warning, and critical states.
 
+Using one or more notifications you've created, call:
+
+    plan = cm.create_notification_plan(label="default", ok_state=ok_hook, warning_state=warning_email, critical_state=critical_email)
+
+Once created, a Notification Plan is used to configure an Alarm.
 
 ## Create an Alarm
 
-To create the alarm, run the following:
+Alarms use all of the previously covered topics and introduce a mini-language used to specify the situation in which a notification should be triggered.
+
+TODO: explain some of the DSL for an example
