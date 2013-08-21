@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import locale
 import os
+import random
 import unittest
 
 from mock import ANY, patch
@@ -379,6 +381,25 @@ class CF_ClientTest(unittest.TestCase):
                 [{"name": "o1"}, {"name": "o2"}])
         obj = client.get_object(self.cont_name, "o1")
         self.assertEqual(obj.name, "o1")
+
+    @patch('pyrax.cf_wrapper.client.Container', new=FakeContainer)
+    def test_get_object_locale(self):
+        client = self.client
+        orig_locale = locale.getlocale(locale.LC_TIME)
+        nonUS_locales = ("de_DE", "fr_FR", "hu_HU", "ja_JP", "nl_NL", "pl_PL",
+                "pt_BR", "pt_PT", "ro_RO", "ru_RU", "zh_CN", "zh_HK", "zh_TW")
+        new_locale = random.choice(nonUS_locales)
+        try:
+            locale.setlocale(locale.LC_TIME, new_locale)
+        except Exception:
+            # Travis CI seems to have a problem with setting locale, so
+            # just skip this.
+            return
+        client.connection.head_container = Mock()
+        client.connection.head_object = Mock(return_value=fake_attdict)
+        obj = client.get_object(self.cont_name, "fake")
+        self.assertEqual(obj.last_modified, "2013-01-01T01:02:03")
+        locale.setlocale(locale.LC_TIME, orig_locale)
 
     @patch('pyrax.cf_wrapper.client.Container', new=FakeContainer)
     def test_store_object(self):
