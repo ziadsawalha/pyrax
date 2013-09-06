@@ -76,6 +76,7 @@ try:
     from clouddns import CloudDNSClient
     from cloudnetworks import CloudNetworkClient
     from cloudmonitoring import CloudMonitorClient
+    from mailgun import MailgunClient
 except ImportError:
     # See if this is the result of the importing of version.py in setup.py
     callstack = inspect.stack()
@@ -97,6 +98,8 @@ cloud_dns = None
 cloud_networks = None
 cloud_monitoring = None
 autoscale = None
+
+mailgun = None
 # Default region for all services. Can be individually overridden if needed
 default_region = None
 # Encoding to use when working with non-ASCII names
@@ -532,7 +535,7 @@ def clear_credentials():
     """De-authenticate by clearing all the names back to None."""
     global identity, regions, services, cloudservers, cloudfiles
     global cloud_loadbalancers, cloud_databases, cloud_blockstorage, cloud_dns
-    global cloud_networks, cloud_monitoring, autoscale
+    global cloud_networks, cloud_monitoring, autoscale, mailgun
     identity = None
     regions = tuple()
     services = tuple()
@@ -544,6 +547,7 @@ def clear_credentials():
     cloud_dns = None
     cloud_networks = None
     cloud_monitoring = None
+    mailgun = None
     autoscale = None
 
 
@@ -562,7 +566,7 @@ def connect_to_services(region=None):
     """Establishes authenticated connections to the various cloud APIs."""
     global cloudservers, cloudfiles, cloud_loadbalancers, cloud_databases
     global cloud_blockstorage, cloud_dns, cloud_networks, cloud_monitoring
-    global autoscale
+    global autoscale, mailgun
     cloudservers = connect_to_cloudservers(region=region)
     cloudfiles = connect_to_cloudfiles(region=region)
     cloud_loadbalancers = connect_to_cloud_loadbalancers(region=region)
@@ -572,6 +576,7 @@ def connect_to_services(region=None):
     cloud_networks = connect_to_cloud_networks(region=region)
     cloud_monitoring = connect_to_cloud_monitoring(region=region)
     autoscale = connect_to_autoscale(region=region)
+    mailgun = connect_to_mailgun(region=region)
 
 
 def _get_service_endpoint(svc, region=None, public=True):
@@ -722,6 +727,15 @@ def connect_to_autoscale(region=None):
     """Creates a client for working with AutoScale."""
     return _create_client(ep_name="autoscale",
             service_type="autoscale", region=region)
+
+
+@_require_auth
+def connect_to_mailgun(region):
+    region = _safe_region(region)
+    verify_ssl = get_setting("verify_ssl")
+    client = MailgunClient(http_log_debug=_http_debug)
+    client.user_agent = _make_agent_name(client.user_agent)
+    return client
 
 
 def get_http_debug():
