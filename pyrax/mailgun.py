@@ -95,6 +95,11 @@ class MailgunDomain(BaseResource):
         """
         return self.manager.get_stats(self.name, events, skip, limit)
 
+    def create_campaign(self, name, campaign_id):
+        """Creates an email campaign."""
+        return self.manager.create_campaign(self.name, campaign_id)
+
+
 class MailgunList(BaseResource):
     """
     This class represents a Mailgun list.
@@ -343,7 +348,7 @@ class MailgunManager(BaseManager):
         uri = "/%s/campaigns" % dom_name,
         data={'name': name,
               'id': campaign_id}
-        return self.api.method_post
+        return self.api.method_post(uri, data=data)
 
     def send_campaign_message(self, dom_name, sender, recipients, subject, text, campaign_id):
         return requests.post(
