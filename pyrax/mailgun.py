@@ -99,57 +99,30 @@ class MailgunDomain(BaseResource):
         """Creates an email campaign."""
         return self.manager.create_campaign(self.name, campaign_id)
 
+    def send_campaign_message(self, sender, recipients, subject, text, campaign_id):
+        """Send a message to an existing campaign."""
+        return self.manager.send_campaign_message(self.name, sender, recipients,
+            subject, text, campaign_id)
 
-class MailgunList(BaseResource):
-    """
-    This class represents a Mailgun list.
-    """
-    def create(self, address, description):
-        """Creates Mailgun mailing list."""
-        return self.manager.create_mailing_list(address, description)
+    def get_campaign_stats(self, campaign_id, limit=20, group_by='daily_hour'):
+        """Get statistics on campaign messages."""
+        return self.manager.get_campaign_stats(self.name, campaign_id, limit, group_by)
 
-    def add(self, name, address, desc, vars):
-        """Adds user info to mailing list."""
-        return self.manager.add_list_member(name, address, desc, vars)
+    def get_mailboxes(self):
+        """Returns list of mailboxes on current domain."""
+        return self.manager.get_mailboxes(self.name)
 
-    def remove(self):
-        pass # Believe this would be updating the above member to sub False.
+    def create_mailbox(self, mailbox_address, password):
+        """Creates mailbox on current domain."""
+        return self.manager.create_mailbox(self.name, mailbox_address, password)
 
-    def delete(self):
-        pass
+    def change_mailbox_password(self, mailbox_name, password):
+        """Changes mailbox account password."""
+        return self.manager.change_mailbox_password(self.name, mailbox_name, password)
 
-
-class MailgunCampaign(BaseResource):
-    """
-    This class represents a Mailgun campaign.
-    """
-    def create(self, dom_name, name, campaign_id):
-        return self.manager.create_campaign(dom_name, name, campaign_id)
-        
-    def send(self, dom_name, sender, recipient, subject, text, campaign_id):
-        return self.manager.send_campaign_message(dom_name, sender, recipient, subject, text, campaign_id)
-        
-    def get_stats(self, dom_name, campaign_id, group_by, limit):
-        return self.manager.get_campaign_stats(dom_name, campaign_id, group_by, limit)
-        
-    def delete(self):
-        pass
-
-class MailgunMailbox(BaseResource):
-    """
-    This class represents a Mailgun mailbox.
-    """
-    def create(self, dom_name, mailbox_address, password):
-        return self.manager.create_mailbox(dom_name, mailbox_address, password)
-        
-    def get(self, dom_name):
-        return self.manager.get_mailboxes(dom_name)
-        
-    def change_password(self, dom_name, mailbox_name, password):
-        return self.manager.change_mailbox_password(dom_name, mailbox_name, password)
-        
-    def delete(self, dom_name, mailbox_name):
-        return self.manager.delete_mailbox(dom_name, mailbox_name)
+    def delete_mailbox(self, mailbox_name):
+        """Deletes specified mailbox from current domain."""
+        return self.manager.delete_mailbox(self.name, mailbox_name)
 
 
 class MailgunManager(BaseManager):
@@ -293,6 +266,7 @@ class MailgunManager(BaseManager):
               "text": text, # "If you wish to unsubscribe, click http://mailgun/unsubscribe/%recipient.id%'"
               "recipient-variables": recipient_vars} # ('{"bob@example.com": {"first":"Bob", "id":1}, '
                                                       # '"alice@example.com": {"first":"Alice", "id": 2}}')
+        return self.api.method_post(uri, data=data)
 
     def create_mailing_list(self, address, description):
         uri= "/lists"
@@ -345,50 +319,50 @@ class MailgunManager(BaseManager):
         return self.api.method_get(uri, params=params)
 
     def create_campaign(self, dom_name, name, campaign_id):
-        uri = "/%s/campaigns" % dom_name,
-        data={'name': name,
-              'id': campaign_id}
+        uri = "/%s/campaigns" % dom_name
+        data={
+            'name': name,
+            'id': campaign_id
+        }
         return self.api.method_post(uri, data=data)
 
     def send_campaign_message(self, dom_name, sender, recipients, subject, text, campaign_id):
-        return requests.post(
-            "https://api.mailgun.net/v2/%s/messages" % dom_name,
-            auth=("api", "key-3ax6xnjp29jd6fds4gc373sgvjxteol0"),
-            data={"from": sender, # ex "Excited User <me@samples.mailgun.org>"
-                  "to": recipients, # ex ["baz@example.com"]
-                  "subject": subject,
-                  "text": text,
-                  "o:campaign": campaign_id})
+        uri = "/%s/messages" % dom_name
+        data={
+            "from": sender, # ex "Excited User <me@samples.mailgun.org>"
+            "to": recipients, # ex ["baz@example.com"]
+            "subject": subject,
+            "text": text,
+            "o:campaign": campaign_id
+        }
+        return self.api.method_post(uri, data=data)
 
-    def get_campaign_stats(self, dom_name, campaign_id, limit=2, group_by='daily_hour'):
-        return requests.get(
-            ("https://api.mailgun.net/v2/%s/campaigns"
-             "/%s/stats?groupby=%s&limit=%s" % (dom_name, campaign_id,
-             group_by, limit)),
-            auth=('api', 'key-3ax6xnjp29jd6fds4gc373sgvjxteol0'))
+    def get_campaign_stats(self, dom_name, campaign_id, limit=20, group_by='daily_hour'):
+        uri = "/%s/campaigns/%s/stats?groupby=%s&limit=%s" % (dom_name, campaign_id,
+            group_by, limit)
+        return self.api.method_get(uri)
 
     def get_mailboxes(self, dom_name):
-        return requests.get(
-            "https://api.mailgun.net/v2/%s/mailboxes", dom_name,
-            auth=("api", "key-3ax6xnjp29jd6fds4gc373sgvjxteol0"))
+        uri = "/%s/mailboxes", dom_name
+        return self.api.method_get(uri)
 
     def create_mailbox(self, dom_name, mailbox_address, password):
-        return requests.post(
-            "https://api.mailgun.net/v2/%s/mailboxes" % dom_name,
-            auth=("api", "key-3ax6xnjp29jd6fds4gc373sgvjxteol0"),
-            data={"mailbox": mailbox_address, # ex "alice@samples.mailgun.org"
-                  "password": password})
+        uri = "/%s/mailboxes" % dom_name
+        data={
+            "mailbox": mailbox_address, # ex "alice@samples.mailgun.org"
+            "password": password
+        }
+        return self.api.method_post(uri, data=data)
 
     def change_mailbox_password(self, dom_name, mailbox_name, password):
-        return requests.put(
-            "https://api.mailgun.net/v2/%s/mailboxes/%s" % (dom_name, mailbox_name),
-            auth=("api", "key-3ax6xnjp29jd6fds4gc373sgvjxteol0"),
-            data={"password": password})
+        uri = "/%s/mailboxes/%s" % (dom_name, mailbox_name)
+        data={"password": password}
+        return self.api.method_put(uri, data=data)
 
     def delete_mailbox(self, dom_name, mailbox_name):
-        return requests.delete(
-            "https://api.mailgun.net/v2/%s/mailboxes/%s" % (dom_name, mailbox_name),
-            auth=("api", "key-3ax6xnjp29jd6fds4gc373sgvjxteol0"))
+        uri = "/%s/mailboxes/%s" % (dom_name, mailbox_name)
+        return self.api.method_delete(uri)
+
 
 class MailgunClient(BaseClient):
     """
