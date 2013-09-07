@@ -37,7 +37,7 @@ class MailgunDomain(BaseResource):
     def __init__(self, *args, **kwargs):
         super(MailgunDomain, self).__init__(*args, **kwargs)
         self.id = self.name
-        
+
     def delete(self):
         """Delete named domain from account."""
         return self.manager.delete(self)
@@ -124,12 +124,31 @@ class MailgunDomain(BaseResource):
         """Deletes specified mailbox from current domain."""
         return self.manager.delete_mailbox(self.name, mailbox_name)
 
+    def list_webhooks(self):
+        """Lists current webhooks on current domain."""
+        return self.manager.list_webhooks(self.name)
+
+    def get_webhook(self, webhook):
+        """Returns data on specified webhook for current domain."""
+        return self.manager.get_webhook(self.name, webhook)
+
+    def create_webhook(self, webhook, url):
+        """Creates specified webhook on current domain."""
+        return self.manager.create_webhook(self.name, webhook, url)
+
+    def update_webhook(self, webhook, url):
+        """Updates the specified webhook with the provided url on current dom."""
+        return self.manager.update_webhook(self.name, webhook, url)
+
+    def delete_webhook(self, webhook):
+        """Deletes specified webhook from current domain."""
+        return self.manager.delete_webhook(self.name, webhook)
+
 
 class MailgunManager(BaseManager):
 
     def fetch_apikey(self):
         """Returns Mailguin api key from valid token/tenant."""
-
         url = "%srackspace/accounts" % MAILGUN_ACCOUNTS_API
         ident = pyrax.identity
         data = {"account_id": ident.tenant_id, "auth_token": ident.token}
@@ -141,7 +160,6 @@ class MailgunManager(BaseManager):
             return req.text
         except requests.exceptions.RequestException:
             raise
-            
         return response
 
     def create(self, dom_name, smtp_pass):
@@ -285,16 +303,16 @@ class MailgunManager(BaseManager):
         }
         return self.api.method_post(uri, data=data)
 
-    def unsubscribe_list_member(self, list, name, address, description, vars):
+    def update_list_member(self, list, name, address, description, vars, subscribed=True):
         uri = 'lists/%s/members' % list # ex dev@samples.mailgun.org
         data={
-            'subscribed': False,
+            'subscribed': subscribed,
             'address': address,
             'name': name,
             'description': description,
             'vars': vars # vars ex. '{"age": 26}'
         }
-        return self.api.method_post(uri, data=data)
+        return self.api.method_put(uri, data=data)
 
     def get_logs(self, dom_name, start_time, limit=100, ascending='yes', pretty='yes', sender=None, receiver=None):
         uri = "/%s/events" % dom_name
@@ -361,6 +379,28 @@ class MailgunManager(BaseManager):
 
     def delete_mailbox(self, dom_name, mailbox_name):
         uri = "/%s/mailboxes/%s" % (dom_name, mailbox_name)
+        return self.api.method_delete(uri)
+
+    def list_webhooks(self, dom_name):
+        uri = "/domains/%s/webhooks" % dom_name
+        return self.api.method_get(uri)
+
+    def get_webhook(self, dom_name, webhook):
+        uri = "/domains/%s/webhooks/%s"
+        return self.api.method_get(uri)
+
+    def create_webhook(self, dom_name, webhook, url):
+        uri = "/domains/%s/webhooks"
+        data = {'id': webhook, 'url': url}
+        return self.api.method_post(uri, data=data)
+
+    def update_webhook(self, dom_name, webhook, url):
+        uri = "/domains/%s/webhooks/%s" % webhook
+        data = {'url': url}
+        return self.api.method_put(uri, data=data)
+
+    def delete_webhook(self, dom_name, webhook):
+        uri = "/domains/%s/webhooks/%s" % webhook
         return self.api.method_delete(uri)
 
 
