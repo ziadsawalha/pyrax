@@ -198,6 +198,9 @@ class MailgunManager(BaseManager):
 
     def _create(self, uri, data):
         resp, resp_body = self.api.method_post(uri, data=data)
+        if resp_body.get('message') == "This domain name is already taken":
+            raise exceptions.DomainRecordNotUnique(code=resp.status_code,
+                    message=resp_body['message'])
         return self.resource_class(self, resp_body.get(self.response_key))
 
 
