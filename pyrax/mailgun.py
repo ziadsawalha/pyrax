@@ -24,6 +24,7 @@ from pyrax.client import BaseClient
 from pyrax import exceptions
 from pyrax.manager import BaseManager
 from pyrax.resource import BaseResource
+from pyrax import utils
 
 MAILGUN_API = "https://api.mailgun.net/v2"
 MAILGUN_ACCOUNTS_API = "https://mailgun.com"
@@ -199,7 +200,7 @@ class MailgunManager(BaseManager):
     def _create(self, uri, data):
         resp, resp_body = self.api.method_post(uri, data=data)
         if resp_body.get('message') == "This domain name is already taken":
-            raise exceptions.DomainRecordNotUnique(code=resp.status_code,
+            raise exceptions.DomainRecordNotUnique(code=resp,
                     message=resp_body['message'])
         return self.resource_class(self, resp_body.get(self.response_key))
 
@@ -229,7 +230,7 @@ class MailgunManager(BaseManager):
         return self.api.method_post(uri, data=data)
 
 
-    def send_complex_message(self, sender, recipients, subject, text,
+    def send_complex_message(self, dom_name, sender, recipients, subject, text,
             cc=None, bcc=None, html=None, files=None):
         """Send message that could include cc, bcc, files and html."""
         uri = "/%s/messages" % dom_name
@@ -295,8 +296,8 @@ class MailgunManager(BaseManager):
             for item in recipients:
                 data.add("to", item)
         else:
-            raise exc.InvalidRecipientTypeException("The received recipients "
-                    "are not valid: %s" % str(recipients))
+            raise exceptions.InvalidRecipientTypeException("The received "
+                    "recipients are not valid: %s" % str(recipients))
         for tag in tags:
             for k, v in tag.items():
                 data.add(k, v)
@@ -390,7 +391,7 @@ class MailgunManager(BaseManager):
 
     def create_mailbox(self, dom_name, mailbox_address, password):
         uri = "/%s/mailboxes" % dom_name
-        datai = {"mailbox": mailbox_address,
+        data = {"mailbox": mailbox_address,
                 "password": password,
                 }
         return self.api.method_post(uri, data=data)
@@ -500,14 +501,8 @@ class MailgunClient(BaseClient):
         Uses requests to perform api request.
         """
         try:
-            print "REQ", self.management_url + uri
-            print "METHOD", method
             req = getattr(requests, method.lower())(self.management_url + uri,
                 headers=HEADERS, auth=self.auth, **kwargs)
-            
-            print
-            print req.text
-            print
             response = req.json()
             code = req.status_code
         except requests.exceptions.RequestException as exc:
