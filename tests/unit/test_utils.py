@@ -299,6 +299,21 @@ class UtilsTest(unittest.TestCase):
         self.assertEqual(utils.iso_time_string(dt, show_tzinfo=False),
                 "1999-12-31T23:59:59")
 
+    def test_rfc2822_format(self):
+        dt = datetime.datetime(1999, 12, 31, 23, 59, 59)
+        expected = "Sat, 01 Jan 2000 05:59:59 -0000"
+        self.assertEqual(utils.rfc2822_format(dt), expected)
+
+    def test_rfc2822_format_string(self):
+        val = utils.random_name()
+        self.assertEqual(utils.rfc2822_format(val), val)
+
+    def test_rfc2822_format_string_timestamp(self):
+        dt = datetime.datetime(1999, 12, 31, 23, 59, 59)
+        tm = time.mktime(dt.timetuple())
+        expected = "Sat, 01 Jan 2000 05:59:59 -0000"
+        self.assertEqual(utils.rfc2822_format(tm), expected)
+
     def test_match_pattern(self):
         ignore_pat = "*.bad"
         self.assertTrue(utils.match_pattern("some.bad", ignore_pat))
