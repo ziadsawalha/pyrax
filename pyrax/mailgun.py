@@ -218,8 +218,8 @@ class MailgunManager(BaseManager):
     def send_simple_message(self, dom_name, sender, recipients, subject, text):
         """Send simple plain text message."""
         uri = "/%s/messages" % dom_name
-        data = {"from": sender, # "Excited User <me@samples.mailgun.org>"
-                "to": recipients, # ["bar@example.com", "baz@example.com"]
+        data = {"from": sender,
+                "to": recipients,
                 "subject": subject,
                 "text": text,
                 }
@@ -244,8 +244,8 @@ class MailgunManager(BaseManager):
     def send_mime_message(self, dom_name, recipient, mime_file):
         """Send message as included mime file."""
         uri = "/%s/messages.mime" % dom_name
-        data = {"to": recipient}, # "bar@example.com"
-        files = {"message": mime_file} # open("files/message.mime")
+        data = {"to": recipient}
+        files = {"message": mime_file}
         return self.api.method_post(uri, data=data, files=files)
 
 
@@ -254,7 +254,7 @@ class MailgunManager(BaseManager):
         """Send message with o:tracking tag set to False."""
         uri = "/%s/messages" % dom_name
         data = {"from": sender,
-                "to": recipients, # ["bar@example.com", "baz@example.com"]
+                "to": recipients,
                 "subject": subject,
                 "text": text,
                 "o:tracking": False,
@@ -269,7 +269,7 @@ class MailgunManager(BaseManager):
         # The delivery_time must be in RFC 2822 format
         delivery_time = utils.rfc2822_format(delivery_time)
         data = {"from": sender,
-                "to": recipient, # "bar@example.com"
+                "to": recipient,
                 "subject": subject,
                 "text": text,
                 "o:deliverytime": delivery_time,
@@ -346,7 +346,7 @@ class MailgunManager(BaseManager):
 
     def get_stats(self, dom_name, events, skip, limit):
         uri = "/%s/stats" % dom_name,
-        params = {"event": events, # ex ["sent", "opened"]
+        params = {"event": events,
                 "skip": skip,
                 "limit": limit,
                 }
@@ -364,8 +364,8 @@ class MailgunManager(BaseManager):
     def send_campaign_message(self, dom_name, sender, recipients, subject,
             text, campaign_id):
         uri = "/%s/messages" % dom_name
-        data = {"from": sender, # ex "Excited User <me@samples.mailgun.org>"
-                "to": recipients, # ex ["baz@example.com"]
+        data = {"from": sender,
+                "to": recipients,
                 "subject": subject,
                 "text": text,
                 "o:campaign": campaign_id,
@@ -387,7 +387,7 @@ class MailgunManager(BaseManager):
 
     def create_mailbox(self, dom_name, mailbox_address, password):
         uri = "/%s/mailboxes" % dom_name
-        datai = {"mailbox": mailbox_address, # ex "alice@samples.mailgun.org"
+        datai = {"mailbox": mailbox_address,
                 "password": password,
                 }
         return self.api.method_post(uri, data=data)
@@ -442,7 +442,7 @@ class MailgunManager(BaseManager):
 
 
     def add_list_member(self, list_name, name, address, description, extra):
-        uri = "lists/%s/members" % list_name # ex dev@samples.mailgun.org
+        uri = "lists/%s/members" % list_name
         data = {"subscribed": True,
                 "address": address,
                 "name": name,
