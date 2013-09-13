@@ -185,9 +185,11 @@ class MailgunManager(BaseManager):
             req = requests.get(url, params=data, headers=HEADERS)                              
             response = req.json()["api_key"]
         except KeyError:
-            return req.text
-        except requests.exceptions.RequestException:
-            raise
+            raise exceptions.AuthorizationFailure("(%s) %s" % (req.status_code,
+                    req.text))
+        except requests.exceptions.RequestException as exc:
+            raise exceptions.AuthenticationFailed("Unable to connect to "
+                    "mailgun accounts api: %s" % exc)
         return response
 
 
@@ -199,9 +201,12 @@ class MailgunManager(BaseManager):
 
     def _create(self, uri, data):
         resp, resp_body = self.api.method_post(uri, data=data)
-        if resp_body.get('message') == "This domain name is already taken":
-            raise exceptions.DomainRecordNotUnique(code=resp,
-                    message=resp_body['message'])
+        if resp == 400:
+            raise exceptions.DomainRecordNotUnique("(%s) %s" % (resp,
+                    resp_body['message']))
+        elif resp not in range(200,300):
+            raise exceptions.DomainCreationFailed("(%s) %s" % (resp,
+                    resp_body['message']))
         return self.resource_class(self, resp_body.get(self.response_key))
 
 
@@ -217,6 +222,14 @@ class MailgunManager(BaseManager):
         key["receiving_dns_records"] = resp_body["receiving_dns_records"]
         key["sending_dns_records"] = resp_body["sending_dns_records"]
         return self.resource_class(self, key)
+
+
+    def _delete(self, uri):
+        """Overloads delete to catch invalid response codes."""
+        resp, resp_body = self.api.method_delete(uri)
+        if resp not in range(200, 300):
+            raise exceptions.DomainDeletionFailed("(%s) %s" % (resp,
+                    resp_body['message']))
 
 
     def send_simple_message(self, dom_name, sender, recipients, subject, text):
@@ -501,13 +514,14 @@ class MailgunClient(BaseClient):
         Uses requests to perform api request.
         """
         try:
+            
             req = getattr(requests, method.lower())(self.management_url + uri,
                 headers=HEADERS, auth=self.auth, **kwargs)
             response = req.json()
             code = req.status_code
         except requests.exceptions.RequestException as exc:
-            # do something
-            raise
+            raise exceptions.ClientException(code='500', message='Unknown '
+                    'error occurred in api request.', details=str(exc))
         return code, response
 
 
