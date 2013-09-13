@@ -37,6 +37,7 @@ setup(
         "python-swiftclient>=1.5.0",
         "httplib2",
         "keyring",
+        "paste",
     ] + testing_requires,
     packages=[
         "pyrax",
