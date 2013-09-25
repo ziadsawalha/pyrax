@@ -493,6 +493,11 @@ class MailgunClient(BaseClient):
         self.auth = ("api", self._manager.fetch_apikey())
 
 
+    def get_limits(self):
+        """Not implemented in Mailgun."""
+        raise NotImplemented()
+
+
     def _configure_manager(self):
         """
         Creates the Manager instance to handle networks.
