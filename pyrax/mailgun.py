@@ -495,7 +495,7 @@ class MailgunClient(BaseClient):
 
     def get_limits(self):
         """Not implemented in Mailgun."""
-        raise NotImplemented()
+        raise NotImplementedError()
 
 
     def _configure_manager(self):
