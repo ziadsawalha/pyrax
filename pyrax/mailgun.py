@@ -490,7 +490,21 @@ class MailgunClient(BaseClient):
         super(MailgunClient, self).__init__(*args, **kwargs)
         self.name = "Mailgun"
         self.management_url = MAILGUN_API
-        self.auth = ("api", self._manager.fetch_apikey())
+        self._auth = None
+
+
+    @property
+    def auth(self):
+        """
+        Get mailgun key.
+
+        Lazy loading: Only get it if requested.
+        """
+        if not self._auth:
+            print "OBTAINING MAILGUN KEY"
+            self._auth = ("api", self._manager.fetch_apikey())
+            print "GORRIT"
+        return self._auth
 
 
     def get_limits(self):
