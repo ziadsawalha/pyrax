@@ -57,19 +57,13 @@ try:
     import version
 
     import cf_wrapper.client as _cf
-    from cf_wrapper.storage_object import StorageObject
-    from cf_wrapper.container import Container
     from novaclient import exceptions as _cs_exceptions
     from novaclient import auth_plugin as _cs_auth_plugin
     from novaclient.v1_1 import client as _cs_client
     from novaclient.v1_1.servers import Server as CloudServer
 
+    from autoscale import AutoScaleClient
     from clouddatabases import CloudDatabaseClient
-    from clouddatabases import CloudDatabaseDatabase
-    from clouddatabases import CloudDatabaseFlavor
-    from clouddatabases import CloudDatabaseInstance
-    from clouddatabases import CloudDatabaseUser
-    from cloudloadbalancers import CloudLoadBalancer
     from cloudloadbalancers import CloudLoadBalancerClient
     from cloudblockstorage import CloudBlockStorageClient
     from clouddns import CloudDNSClient
@@ -95,6 +89,7 @@ cloud_blockstorage = None
 cloud_dns = None
 cloud_networks = None
 cloud_monitoring = None
+autoscale = None
 # Default region for all services. Can be individually overridden if needed
 default_region = None
 # Encoding to use when working with non-ASCII names
@@ -121,7 +116,8 @@ _client_classes = {
         "volume": CloudBlockStorageClient,
         "dns": CloudDNSClient,
         "compute:network": CloudNetworkClient,
-        "monitor": CloudMonitorClient
+        "monitor": CloudMonitorClient,
+        "autoscale": AutoScaleClient,
         }
 
 
@@ -390,6 +386,12 @@ def _safe_region(region=None):
     if not ret:
         # Nothing specified; get the default from the identity object.
         ret = identity.get_default_region()
+    if not ret:
+        # Use the first available region
+        try:
+            ret = regions[0]
+        except IndexError:
+            ret = ""
     return ret
 
 
@@ -529,7 +531,7 @@ def clear_credentials():
     """De-authenticate by clearing all the names back to None."""
     global identity, regions, services, cloudservers, cloudfiles
     global cloud_loadbalancers, cloud_databases, cloud_blockstorage, cloud_dns
-    global cloud_networks, cloud_monitoring
+    global cloud_networks, cloud_monitoring, autoscale
     identity = None
     regions = tuple()
     services = tuple()
@@ -541,6 +543,7 @@ def clear_credentials():
     cloud_dns = None
     cloud_networks = None
     cloud_monitoring = None
+    autoscale = None
 
 
 def _make_agent_name(base):
@@ -558,6 +561,7 @@ def connect_to_services(region=None):
     """Establishes authenticated connections to the various cloud APIs."""
     global cloudservers, cloudfiles, cloud_loadbalancers, cloud_databases
     global cloud_blockstorage, cloud_dns, cloud_networks, cloud_monitoring
+    global autoscale
     cloudservers = connect_to_cloudservers(region=region)
     cloudfiles = connect_to_cloudfiles(region=region)
     cloud_loadbalancers = connect_to_cloud_loadbalancers(region=region)
@@ -566,6 +570,7 @@ def connect_to_services(region=None):
     cloud_dns = connect_to_cloud_dns(region=region)
     cloud_networks = connect_to_cloud_networks(region=region)
     cloud_monitoring = connect_to_cloud_monitoring(region=region)
+    autoscale = connect_to_autoscale(region=region)
 
 
 def _get_service_endpoint(svc, region=None, public=True):
@@ -712,6 +717,12 @@ def connect_to_cloud_monitoring(region=None):
             region=region)
 
 
+def connect_to_autoscale(region=None):
+    """Creates a client for working with AutoScale."""
+    return _create_client(ep_name="autoscale",
+            service_type="autoscale", region=region)
+
+
 def get_http_debug():
     return _http_debug
 
@@ -723,7 +734,8 @@ def set_http_debug(val):
     # Set debug on the various services
     identity.http_log_debug = val
     for svc in (cloudservers, cloudfiles, cloud_loadbalancers,
-            cloud_blockstorage, cloud_databases, cloud_dns, cloud_networks):
+            cloud_blockstorage, cloud_databases, cloud_dns, cloud_networks,
+            autoscale):
         if svc is not None:
             svc.http_log_debug = val
     if not val:

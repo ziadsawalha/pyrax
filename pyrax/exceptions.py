@@ -89,6 +89,9 @@ class FileNotFound(PyraxException):
 class FolderNotFound(PyraxException):
     pass
 
+class InvalidEmail(PyraxException):
+    pass
+
 class KeyringModuleNotInstalled(PyraxException):
     pass
 
@@ -114,6 +117,9 @@ class InvalidDateTimeString(PyraxException):
     pass
 
 class InvalidDeviceType(PyraxException):
+    pass
+
+class InvalidLoadBalancer(PyraxException):
     pass
 
 class InvalidLoadBalancerParameters(PyraxException):
