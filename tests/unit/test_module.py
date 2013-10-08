@@ -14,7 +14,6 @@ import pyrax.utils as utils
 import fakes
 
 
-import base_test
 
 class PyraxInitTest(unittest.TestCase):
     def __init__(self, *args, **kwargs):
