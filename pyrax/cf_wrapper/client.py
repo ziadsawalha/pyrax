@@ -68,8 +68,8 @@ def handle_swiftclient_exception(fnc):
                     # Assume it is an auth failure. Re-auth and retry.
                     ### NOTE: This is a hack to get around an apparent bug
                     ### in python-swiftclient when using Rackspace auth.
-                    pyrax.authenticate(connect=False)
-                    if pyrax.identity.authenticated:
+                    pyrax.authenticate(self.identity, connect=False)
+                    if self.identity.authenticated:
                         pyrax.plug_hole_in_swiftclient_auth(self, clt_url)
                     continue
                 str_error = "%s" % e
@@ -1379,8 +1379,8 @@ class Connection(_swift_client.Connection):
                 response = None
             if response:
                 if response.status == 401:
-                    pyrax.identity.authenticate()
-                    headers["X-Auth-Token"] = pyrax.identity.token
+                    self.identity.authenticate()
+                    headers["X-Auth-Token"] = self.identity.token
                 else:
                     break
             attempt += 1
@@ -1464,7 +1464,7 @@ class BulkDeleter(threading.Thread):
         cname = client._resolve_name(container)
         parsed, conn = client.connection.http_connection()
         method = "DELETE"
-        headers = {"X-Auth-Token": pyrax.identity.token,
+        headers = {"X-Auth-Token": self.client.identity.token,
                 "Content-type": "text/plain",
                 }
         obj_paths = ("%s/%s" % (cname, nm) for nm in object_names)

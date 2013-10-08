@@ -14,6 +14,7 @@ from pyrax.cf_wrapper.container import Container
 from pyrax.cf_wrapper.container import Fault
 import pyrax.utils as utils
 import pyrax.exceptions as exc
+
 from tests.unit.fakes import fake_attdict
 from tests.unit.fakes import FakeContainer
 from tests.unit.fakes import FakeIdentity
@@ -31,13 +32,12 @@ class CF_ContainerTest(unittest.TestCase):
         self.orig_connect_to_cloud_loadbalancers = ctclb
         ctcbs = pyrax.connect_to_cloud_blockstorage
         self.orig_connect_to_cloud_blockstorage = ctcbs
+        self.identity = FakeIdentity()
         super(CF_ContainerTest, self).__init__(*args, **kwargs)
-        pyrax.identity = FakeIdentity()
         pyrax.connect_to_cloudservers = Mock()
         pyrax.connect_to_cloud_loadbalancers = Mock()
         pyrax.connect_to_cloud_databases = Mock()
         pyrax.connect_to_cloud_blockstorage = Mock()
-        pyrax.set_credentials("fakeuser", "fakeapikey")
 
     @patch('pyrax.cf_wrapper.client.Container', new=FakeContainer)
     def setUp(self):
@@ -45,8 +45,9 @@ class CF_ContainerTest(unittest.TestCase):
         pyrax.connect_to_cloud_loadbalancers = Mock()
         pyrax.connect_to_cloud_databases = Mock()
         pyrax.connect_to_cloud_blockstorage = Mock()
-        pyrax.connect_to_cloudfiles()
-        self.client = pyrax.cloudfiles
+        pyrax._create_identity = Mock(return_value=self.identity)
+        pyrax.set_credentials("fakeuser", "fakeapikey")
+        self.client = pyrax.connect_to_cloudfiles(self.identity)
         self.client.connection.head_container = Mock()
         self.cont_name = utils.random_name(ascii_only=True)
         self.container = self.client.get_container(self.cont_name)

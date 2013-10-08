@@ -25,6 +25,7 @@ from tests.unit import fakes
 
 class AutoscaleTest(unittest.TestCase):
     def __init__(self, *args, **kwargs):
+        self.identity = fakes.FakeIdentity()
         super(AutoscaleTest, self).__init__(*args, **kwargs)
 
     def setUp(self):
@@ -1034,7 +1035,7 @@ class AutoscaleTest(unittest.TestCase):
         pol.delete_webhook.assert_called_once_with(hook)
 
     def test_clt_get_state(self):
-        clt = fakes.FakeAutoScaleClient()
+        clt = fakes.FakeAutoScaleClient(self.identity)
         sg = self.scaling_group
         mgr = clt._manager
         mgr.get_state = Mock()
@@ -1042,7 +1043,7 @@ class AutoscaleTest(unittest.TestCase):
         mgr.get_state.assert_called_once_with(sg)
 
     def test_clt_pause(self):
-        clt = fakes.FakeAutoScaleClient()
+        clt = fakes.FakeAutoScaleClient(self.identity)
         sg = self.scaling_group
         mgr = clt._manager
         mgr.pause = Mock()
@@ -1050,7 +1051,7 @@ class AutoscaleTest(unittest.TestCase):
         mgr.pause.assert_called_once_with(sg)
 
     def test_clt_resume(self):
-        clt = fakes.FakeAutoScaleClient()
+        clt = fakes.FakeAutoScaleClient(self.identity)
         mgr = clt._manager
         sg = self.scaling_group
         mgr.resume = Mock()
@@ -1058,7 +1059,7 @@ class AutoscaleTest(unittest.TestCase):
         mgr.resume.assert_called_once_with(sg)
 
     def test_clt_update(self):
-        clt = fakes.FakeAutoScaleClient()
+        clt = fakes.FakeAutoScaleClient(self.identity)
         mgr = clt._manager
         sg = self.scaling_group
         name = utils.random_name()
@@ -1074,7 +1075,7 @@ class AutoscaleTest(unittest.TestCase):
                 metadata=metadata)
 
     def test_clt_update_metadata(self):
-        clt = fakes.FakeAutoScaleClient()
+        clt = fakes.FakeAutoScaleClient(self.identity)
         mgr = clt._manager
         sg = self.scaling_group
         metadata = utils.random_name()
@@ -1083,7 +1084,7 @@ class AutoscaleTest(unittest.TestCase):
         mgr.update_metadata.assert_called_once_with(sg, metadata)
 
     def test_clt_get_configuration(self):
-        clt = fakes.FakeAutoScaleClient()
+        clt = fakes.FakeAutoScaleClient(self.identity)
         mgr = clt._manager
         sg = self.scaling_group
         mgr.get_configuration = Mock()
@@ -1091,7 +1092,7 @@ class AutoscaleTest(unittest.TestCase):
         mgr.get_configuration.assert_called_once_with(sg)
 
     def test_clt_get_launch_config(self):
-        clt = fakes.FakeAutoScaleClient()
+        clt = fakes.FakeAutoScaleClient(self.identity)
         mgr = clt._manager
         sg = self.scaling_group
         mgr.get_launch_config = Mock()
@@ -1099,7 +1100,7 @@ class AutoscaleTest(unittest.TestCase):
         mgr.get_launch_config.assert_called_once_with(sg)
 
     def test_clt_update_launch_config(self):
-        clt = fakes.FakeAutoScaleClient()
+        clt = fakes.FakeAutoScaleClient(self.identity)
         mgr = clt._manager
         sg = self.scaling_group
         mgr.update_launch_config = Mock()
@@ -1124,7 +1125,7 @@ class AutoscaleTest(unittest.TestCase):
                 load_balancers=load_balancers, key_name=key_name)
 
     def test_clt_update_launch_metadata(self):
-        clt = fakes.FakeAutoScaleClient()
+        clt = fakes.FakeAutoScaleClient(self.identity)
         mgr = clt._manager
         sg = self.scaling_group
         mgr.update_launch_metadata = Mock()
@@ -1133,7 +1134,7 @@ class AutoscaleTest(unittest.TestCase):
         mgr.update_launch_metadata.assert_called_once_with(sg, metadata)
 
     def test_clt_add_policy(self):
-        clt = fakes.FakeAutoScaleClient()
+        clt = fakes.FakeAutoScaleClient(self.identity)
         mgr = clt._manager
         sg = self.scaling_group
         name = utils.random_name()
@@ -1152,7 +1153,7 @@ class AutoscaleTest(unittest.TestCase):
                 desired_capacity=desired_capacity, args=args)
 
     def test_clt_list_policies(self):
-        clt = fakes.FakeAutoScaleClient()
+        clt = fakes.FakeAutoScaleClient(self.identity)
         mgr = clt._manager
         sg = self.scaling_group
         mgr.list_policies = Mock()
@@ -1160,7 +1161,7 @@ class AutoscaleTest(unittest.TestCase):
         mgr.list_policies.assert_called_once_with(sg)
 
     def test_clt_get_policy(self):
-        clt = fakes.FakeAutoScaleClient()
+        clt = fakes.FakeAutoScaleClient(self.identity)
         mgr = clt._manager
         sg = self.scaling_group
         pol = utils.random_name()
@@ -1169,7 +1170,7 @@ class AutoscaleTest(unittest.TestCase):
         mgr.get_policy.assert_called_once_with(sg, pol)
 
     def test_clt_update_policy(self):
-        clt = fakes.FakeAutoScaleClient()
+        clt = fakes.FakeAutoScaleClient(self.identity)
         mgr = clt._manager
         sg = self.scaling_group
         pol = utils.random_name()
@@ -1190,7 +1191,7 @@ class AutoscaleTest(unittest.TestCase):
                 args=args)
 
     def test_clt_execute_policy(self):
-        clt = fakes.FakeAutoScaleClient()
+        clt = fakes.FakeAutoScaleClient(self.identity)
         mgr = clt._manager
         sg = self.scaling_group
         pol = utils.random_name()
@@ -1199,7 +1200,7 @@ class AutoscaleTest(unittest.TestCase):
         mgr.execute_policy.assert_called_once_with(scaling_group=sg, policy=pol)
 
     def test_clt_delete_policy(self):
-        clt = fakes.FakeAutoScaleClient()
+        clt = fakes.FakeAutoScaleClient(self.identity)
         mgr = clt._manager
         sg = self.scaling_group
         pol = utils.random_name()
@@ -1208,7 +1209,7 @@ class AutoscaleTest(unittest.TestCase):
         mgr.delete_policy.assert_called_once_with(scaling_group=sg, policy=pol)
 
     def test_clt_add_webhook(self):
-        clt = fakes.FakeAutoScaleClient()
+        clt = fakes.FakeAutoScaleClient(self.identity)
         mgr = clt._manager
         sg = self.scaling_group
         pol = utils.random_name()
@@ -1219,7 +1220,7 @@ class AutoscaleTest(unittest.TestCase):
         mgr.add_webhook.assert_called_once_with(sg, pol, name, metadata=metadata)
 
     def test_clt_list_webhooks(self):
-        clt = fakes.FakeAutoScaleClient()
+        clt = fakes.FakeAutoScaleClient(self.identity)
         mgr = clt._manager
         sg = self.scaling_group
         pol = utils.random_name()
@@ -1228,7 +1229,7 @@ class AutoscaleTest(unittest.TestCase):
         mgr.list_webhooks.assert_called_once_with(sg, pol)
 
     def test_clt_get_webhook(self):
-        clt = fakes.FakeAutoScaleClient()
+        clt = fakes.FakeAutoScaleClient(self.identity)
         mgr = clt._manager
         sg = self.scaling_group
         pol = utils.random_name()
@@ -1238,7 +1239,7 @@ class AutoscaleTest(unittest.TestCase):
         mgr.get_webhook.assert_called_once_with(sg, pol, hook)
 
     def test_clt_update_webhook(self):
-        clt = fakes.FakeAutoScaleClient()
+        clt = fakes.FakeAutoScaleClient(self.identity)
         mgr = clt._manager
         sg = self.scaling_group
         pol = utils.random_name()
@@ -1251,7 +1252,7 @@ class AutoscaleTest(unittest.TestCase):
                 webhook=hook, name=name, metadata=metadata)
 
     def test_clt_update_webhook_metadata(self):
-        clt = fakes.FakeAutoScaleClient()
+        clt = fakes.FakeAutoScaleClient(self.identity)
         mgr = clt._manager
         sg = self.scaling_group
         pol = utils.random_name()
@@ -1263,7 +1264,7 @@ class AutoscaleTest(unittest.TestCase):
                 metadata)
 
     def test_clt_delete_webhook(self):
-        clt = fakes.FakeAutoScaleClient()
+        clt = fakes.FakeAutoScaleClient(self.identity)
         mgr = clt._manager
         sg = self.scaling_group
         pol = utils.random_name()

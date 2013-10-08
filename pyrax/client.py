@@ -40,12 +40,13 @@ class BaseClient(httplib2.Http):
     # Each client subclass should set their own name.
     name = "base"
 
-    def __init__(self, region_name=None, endpoint_type="publicURL",
+    def __init__(self, identity, region_name=None, endpoint_type="publicURL",
             management_url=None, service_type=None, service_name=None,
             timings=False, verify_ssl=True, http_log_debug=False,
             timeout=None):
         super(BaseClient, self).__init__(timeout=timeout)
         self.version = "v1.1"
+        self.identity = identity
         self.region_name = region_name
         self.endpoint_type = endpoint_type
         self.service_type = service_type
@@ -121,7 +122,7 @@ class BaseClient(httplib2.Http):
 
     def unauthenticate(self):
         """Clears all of our authentication information."""
-        pyrax.identity.unauthenticate()
+        self.identity.unauthenticate()
 
 
     def get_timings(self):
@@ -218,7 +219,7 @@ class BaseClient(httplib2.Http):
         the request after authenticating if the initial request returned
         and Unauthorized exception.
         """
-        id_svc = pyrax.identity
+        id_svc = self.identity
         if not all((self.management_url, id_svc.token, id_svc.tenant_id)):
             id_svc.authenticate()
 
@@ -290,7 +291,7 @@ class BaseClient(httplib2.Http):
         to modify this method. Please post your findings on GitHub so that
         others can benefit.
         """
-        return pyrax.identity.authenticate()
+        return self.identity.authenticate()
 
 
     @property
@@ -299,4 +300,4 @@ class BaseClient(httplib2.Http):
         The older parts of this code used 'projectid'; this wraps that
         reference.
         """
-        return pyrax.identity.tenant_id
+        return self.identity.tenant_id

@@ -441,9 +441,9 @@ class FakeCloudNetwork(CloudNetwork):
 
 
 class FakeAutoScaleClient(AutoScaleClient):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, identity, *args, **kwargs):
         self._manager = FakeManager()
-        super(FakeAutoScaleClient, self).__init__(*args, **kwargs)
+        super(FakeAutoScaleClient, self).__init__(identity, *args, **kwargs)
 
 
 class FakeAutoScalePolicy(AutoScalePolicy):
@@ -461,7 +461,7 @@ class FakeAutoScaleWebhook(AutoScaleWebhook):
 class FakeScalingGroupManager(ScalingGroupManager):
     def __init__(self, api=None, *args, **kwargs):
         if api is None:
-            api = FakeAutoScaleClient()
+            api = FakeAutoScaleClient(identity=FakeIdentity())
         super(FakeScalingGroupManager, self).__init__(api, *args, **kwargs)
         self.id = utils.random_name(ascii_only=True)
 
@@ -538,6 +538,7 @@ class FakeIdentity(RaxIdentity):
 
     def fake_response(self):
         return fake_identity_response
+
 
 
 fake_config_file = """[settings]

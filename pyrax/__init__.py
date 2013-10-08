@@ -98,7 +98,6 @@ default_encoding = "utf-8"
 # Config settings
 settings = {}
 _environment = "default"
-identity = None
 
 # Value to plug into the user-agent headers
 USER_AGENT = "pyrax/%s" % version.version
@@ -204,19 +203,6 @@ class Settings(object):
         if key == "identity_type":
             # If setting the identity_type, also change the identity_class.
             dct["identity_class"] = _import_identity(val)
-        elif key == "region":
-            if not identity:
-                return
-            current = identity.region
-            if current == val:
-                return
-            if "LON" in (current, val):
-                # This is an outlier, as it has a separate auth
-                identity.region = val
-        elif key == "verify_ssl":
-            if not identity:
-                return
-            identity.verify_ssl = val
 
 
     def _getEnvironment(self):
@@ -228,7 +214,6 @@ class Settings(object):
                     "defined." % val)
         if val != self.environment:
             self._environment = val
-            clear_credentials()
             _create_identity()
 
     environment = property(_getEnvironment, _setEnvironment, None,
@@ -344,48 +329,27 @@ def set_default_region(region):
     default_region = region
 
 
-def _create_identity():
+def _create_identity(cls=None):
     """
-    Creates an instance of the current identity_class and assigns it to the
-    module-level name 'identity'.
+    Returns an instance of the specified identity class, or if not specified,
+    the class defined in the setting `identity_class`.
     """
-    global identity
-    cls = settings.get("identity_class")
+    cls = cls or settings.get("identity_class")
     if not cls:
         raise exc.IdentityClassNotDefined("No identity class has "
                 "been defined for the current environment.")
     verify_ssl = get_setting("verify_ssl")
     identity = cls(verify_ssl=verify_ssl)
+    return identity
 
 
-def _assure_identity(fnc):
-    """Ensures that the 'identity' attribute is not None."""
-    def _wrapped(*args, **kwargs):
-        if identity is None:
-            _create_identity()
-        return fnc(*args, **kwargs)
-    return _wrapped
-
-
-def _require_auth(fnc):
-    """Authentication decorator."""
-    @wraps(fnc)
-    @_assure_identity
-    def _wrapped(*args, **kwargs):
-        if not identity.authenticated:
-            msg = "Authentication required before calling '%s'." % fnc.__name__
-            raise exc.NotAuthenticated(msg)
-        return fnc(*args, **kwargs)
-    return _wrapped
-
-
-@_assure_identity
-def _safe_region(region=None):
+def _safe_region(region=None, identity=None):
     """Value to use when no region is specified."""
     ret = region or settings.get("region")
     if not ret:
         # Nothing specified; get the default from the identity object.
-        ret = identity.get_default_region()
+        if identity:
+            ret = identity.get_default_region()
     if not ret:
         # Use the first available region
         try:
@@ -395,37 +359,49 @@ def _safe_region(region=None):
     return ret
 
 
-@_assure_identity
-def auth_with_token(token, tenant_id=None, tenant_name=None, region=None):
+def auth_with_token(token, identity=None, tenant_id=None, tenant_name=None,
+        region=None):
     """
     If you already have a valid token and either a tenant ID or name, you can
     call this to configure the identity and available services.
+
+    A dictionary containing the clients for the various services that are
+    available is returned, with the generic name of the service, such as
+    'compute' or 'databases' as the keys, with the corresponding client as the
+    values.
     """
+    identity = identity or _create_identity()
     identity.auth_with_token(token, tenant_id=tenant_id,
             tenant_name=tenant_name)
-    connect_to_services(region=region)
+    return connect_to_services(identity, region=region)
 
 
-@_assure_identity
 def set_credentials(username, api_key=None, password=None, region=None,
-        tenant_id=None, authenticate=True):
+        identity=None, tenant_id=None, authenticate=True):
     """
     Set the credentials directly, and then try to authenticate.
 
     If the region is passed, it will authenticate against the proper endpoint
     for that region, and set the default region for connections.
+
+    If `authenticate` is False, None is returned. If it is True (default), a
+    dictionary containing the clients for the various services that are
+    available is returned, with the generic name of the service, such as
+    'compute' or 'databases' as the keys, with the corresponding client as the
+    values.
     """
     pw_key = password or api_key
-    region = _safe_region(region)
     tenant_id = tenant_id or settings.get("tenant_id")
+    identity = identity or _create_identity()
+    region = _safe_region(region, identity)
     identity.set_credentials(username=username, password=pw_key,
             tenant_id=tenant_id, region=region)
     if authenticate:
-        _auth_and_connect(region=region)
+        return _auth_and_connect(identity, region=region)
 
 
-@_assure_identity
-def set_credential_file(cred_file, region=None, authenticate=True):
+def set_credential_file(cred_file, region=None, identity=None,
+        authenticate=True):
     """
     Read in the credentials from the supplied file path, and then try to
     authenticate. The file should be a standard config file in one of the
@@ -444,14 +420,21 @@ def set_credential_file(cred_file, region=None, authenticate=True):
 
     If the region is passed, it will authenticate against the proper endpoint
     for that region, and set the default region for connections.
+
+    If `authenticate` is False, None is returned. If it is True (default), a
+    dictionary containing the clients for the various services that are
+    available is returned, with the generic name of the service, such as
+    'compute' or 'databases' as the keys, with the corresponding client as the
+    values.
     """
-    region = _safe_region(region)
+    identity = identity or _create_identity()
+    region = _safe_region(region, identity)
     identity.set_credential_file(cred_file, region=region)
     if authenticate:
-        _auth_and_connect(region=region)
+        return _auth_and_connect(identity, region=region)
 
 
-def keyring_auth(username=None, region=None, authenticate=True):
+def keyring_auth(username=None, region=None, identity=None, authenticate=True):
     """
     Use the password stored within the keyring to authenticate. If a username
     is supplied, that name is used; otherwise, the keyring_username value
@@ -463,6 +446,12 @@ def keyring_auth(username=None, region=None, authenticate=True):
 
     If the region is passed, it will authenticate against the proper endpoint
     for that region, and set the default region for connections.
+
+    If `authenticate` is False, None is returned. If it is True (default), a
+    dictionary containing the clients for the various services that are
+    available is returned, with the generic name of the service, such as
+    'compute' or 'databases' as the keys, with the corresponding client as the
+    values.
     """
     if not keyring:
         # Module not installed
@@ -477,29 +466,28 @@ def keyring_auth(username=None, region=None, authenticate=True):
     if password is None:
         raise exc.KeyringPasswordNotFound("No password was found for the "
                 "username '%s'." % username)
-    set_credentials(username, password, region=region,
+    return set_credentials(username, password, region=region, identity=identity,
             authenticate=authenticate)
 
 
-def _auth_and_connect(region=None, connect=True):
+def _auth_and_connect(identity, region=None, connect=True):
     """
-    Handles the call to authenticate, and if successful, connects to the
-    various services.
+    Handles the call to authenticate, and if successful, creates clients for
+    the services in the service catalog and returns a dictionary with the
+    generic name of the service, such as 'compute' or 'databases' as the keys,
+    with the corresponding client as the values.
     """
     global default_region
-    identity.authenticated = False
     default_region = region or default_region
     try:
         identity.authenticate()
     except exc.AuthenticationFailed:
-        clear_credentials()
         raise
     if connect:
-        connect_to_services(region=region)
+        return connect_to_services(identity, region=region)
 
 
-@_assure_identity
-def authenticate(connect=True):
+def authenticate(identity, connect=True):
     """
     Generally you will not need to call this directly; passing in your
     credentials via set_credentials() and set_credential_file() will call
@@ -513,7 +501,7 @@ def authenticate(connect=True):
     services will be made. However, passing False to the `connect` parameter
     will skip the service connection step.
     """
-    _auth_and_connect(connect=connect)
+    _auth_and_connect(identity, connect=connect)
 
 
 def plug_hole_in_swiftclient_auth(clt, url):
@@ -523,27 +511,8 @@ def plug_hole_in_swiftclient_auth(clt, url):
     workaround until we can fix swiftclient.
     """
     conn = clt.connection
-    conn.token = identity.token
+    conn.token = clt.identity.token
     conn.url = url
-
-
-def clear_credentials():
-    """De-authenticate by clearing all the names back to None."""
-    global identity, regions, services, cloudservers, cloudfiles
-    global cloud_loadbalancers, cloud_databases, cloud_blockstorage, cloud_dns
-    global cloud_networks, cloud_monitoring, autoscale
-    identity = None
-    regions = tuple()
-    services = tuple()
-    cloudservers = None
-    cloudfiles = None
-    cloud_loadbalancers = None
-    cloud_databases = None
-    cloud_blockstorage = None
-    cloud_dns = None
-    cloud_networks = None
-    cloud_monitoring = None
-    autoscale = None
 
 
 def _make_agent_name(base):
@@ -557,27 +526,47 @@ def _make_agent_name(base):
         return USER_AGENT
 
 
-def connect_to_services(region=None):
+def connect_to_services(identity, region=None):
     """Establishes authenticated connections to the various cloud APIs."""
     global cloudservers, cloudfiles, cloud_loadbalancers, cloud_databases
     global cloud_blockstorage, cloud_dns, cloud_networks, cloud_monitoring
     global autoscale
-    cloudservers = connect_to_cloudservers(region=region)
-    cloudfiles = connect_to_cloudfiles(region=region)
-    cloud_loadbalancers = connect_to_cloud_loadbalancers(region=region)
-    cloud_databases = connect_to_cloud_databases(region=region)
-    cloud_blockstorage = connect_to_cloud_blockstorage(region=region)
-    cloud_dns = connect_to_cloud_dns(region=region)
-    cloud_networks = connect_to_cloud_networks(region=region)
-    cloud_monitoring = connect_to_cloud_monitoring(region=region)
-    autoscale = connect_to_autoscale(region=region)
+    services = {}
+    cloudservers = connect_to_cloudservers(identity, region=region)
+    if cloudservers:
+        services["compute"] = cloudservers
+    cloudfiles = connect_to_cloudfiles(identity, region=region)
+    if cloudfiles:
+        services["object_storage"] = cloudfiles
+    cloud_loadbalancers = connect_to_cloud_loadbalancers(identity, region=region)
+    if cloud_loadbalancers:
+        services["load_balancer"] = cloud_loadbalancers
+    cloud_databases = connect_to_cloud_databases(identity, region=region)
+    if cloud_databases:
+        services["database"] = cloud_databases
+    cloud_blockstorage = connect_to_cloud_blockstorage(identity, region=region)
+    if cloud_blockstorage:
+        services["volume"] = cloud_blockstorage
+    cloud_dns = connect_to_cloud_dns(identity, region=region)
+    if cloud_dns:
+        services["dns"] = cloud_dns
+    cloud_networks = connect_to_cloud_networks(identity, region=region)
+    if cloud_networks:
+        services["network"] = cloud_networks
+    cloud_monitoring = connect_to_cloud_monitoring(identity, region=region)
+    if cloud_monitoring:
+        services["monitor"] = cloud_monitoring
+    autoscale = connect_to_autoscale(identity, region=region)
+    if autoscale:
+        services["autoscale"] = autoscale
+    return services
 
 
-def _get_service_endpoint(svc, region=None, public=True):
+def _get_service_endpoint(identity, svc, region=None, public=True):
     """
     Parses the services dict to get the proper endpoint for the given service.
     """
-    region = _safe_region(region)
+    region = _safe_region(region, identity)
     url_type = {True: "public_url", False: "internal_url"}[public]
     ep = identity.services.get(svc, {}).get("endpoints", {}).get(
             region, {}).get(url_type)
@@ -588,8 +577,7 @@ def _get_service_endpoint(svc, region=None, public=True):
     return ep
 
 
-@_require_auth
-def connect_to_cloudservers(region=None, **kwargs):
+def connect_to_cloudservers(identity, region=None, **kwargs):
     """Creates a client for working with cloud servers."""
     _cs_auth_plugin.discover_auth_systems()
     id_type = get_setting("identity_type")
@@ -597,8 +585,8 @@ def connect_to_cloudservers(region=None, **kwargs):
         auth_plugin = _cs_auth_plugin.load_plugin(id_type)
     else:
         auth_plugin = None
-    region = _safe_region(region)
-    mgt_url = _get_service_endpoint("compute", region)
+    region = _safe_region(region, identity)
+    mgt_url = _get_service_endpoint(identity, "compute", region)
     cloudservers = None
     if not mgt_url:
         # Service is not available
@@ -610,6 +598,7 @@ def connect_to_cloudservers(region=None, **kwargs):
             auth_plugin=auth_plugin, insecure=insecure,
             http_log_debug=_http_debug, **kwargs)
     agt = cloudservers.client.USER_AGENT
+    cloudservers.identity = identity
     cloudservers.client.USER_AGENT = _make_agent_name(agt)
     cloudservers.client.management_url = mgt_url
     cloudservers.client.auth_token = identity.token
@@ -640,20 +629,20 @@ def connect_to_cloudservers(region=None, **kwargs):
     return cloudservers
 
 
-@_require_auth
-def connect_to_cloudfiles(region=None, public=True):
+def connect_to_cloudfiles(identity, region=None, public=True):
     """
     Creates a client for working with cloud files. The default is to connect
     to the public URL; if you need to work with the ServiceNet connection, pass
     False to the 'public' parameter.
     """
-    region = _safe_region(region)
-    cf_url = _get_service_endpoint("object_store", region, public=public)
+    region = _safe_region(region, identity)
+    cf_url = _get_service_endpoint(identity, "object_store", region,
+            public=public)
     cloudfiles = None
     if not cf_url:
         # Service is not available
         return
-    cdn_url = _get_service_endpoint("object_cdn", region)
+    cdn_url = _get_service_endpoint(identity, "object_cdn", region)
     ep_type = {True: "publicURL", False: "internalURL"}[public]
     opts = {"tenant_id": identity.tenant_name, "auth_token": identity.token,
             "endpoint_type": ep_type, "tenant_name": identity.tenant_name,
@@ -664,62 +653,64 @@ def connect_to_cloudfiles(region=None, public=True):
             identity.password, tenant_name=identity.tenant_name,
             preauthurl=cf_url, preauthtoken=identity.token, auth_version="2",
             os_options=opts, verify_ssl=verify_ssl, http_log_debug=_http_debug)
+    cloudfiles.identity = identity
     cloudfiles.user_agent = _make_agent_name(cloudfiles.user_agent)
     return cloudfiles
 
 
-@_require_auth
-def _create_client(ep_name, service_type, region):
-    region = _safe_region(region)
-    ep = _get_service_endpoint(ep_name.split(":")[0], region)
+def _create_client(identity, ep_name, service_type, region):
+    region = _safe_region(region, identity)
+    ep = _get_service_endpoint(identity, ep_name.split(":")[0], region)
     if not ep:
         return
     verify_ssl = get_setting("verify_ssl")
     cls = _client_classes[ep_name]
-    client = cls(region_name=region, management_url=ep, verify_ssl=verify_ssl,
-            http_log_debug=_http_debug, service_type=service_type)
+    client = cls(identity, region_name=region, management_url=ep,
+            verify_ssl=verify_ssl, http_log_debug=_http_debug,
+            service_type=service_type)
     client.user_agent = _make_agent_name(client.user_agent)
     return client
 
 
-def connect_to_cloud_databases(region=None):
+def connect_to_cloud_databases(identity, region=None):
     """Creates a client for working with cloud databases."""
-    return _create_client(ep_name="database", service_type="rax:database",
-            region=region)
+    return _create_client(identity, ep_name="database",
+            service_type="rax:database", region=region)
 
 
-def connect_to_cloud_loadbalancers(region=None):
+def connect_to_cloud_loadbalancers(identity, region=None):
     """Creates a client for working with cloud loadbalancers."""
-    return _create_client(ep_name="load_balancer",
+    return _create_client(identity, ep_name="load_balancer",
             service_type="rax:load-balancer", region=region)
 
 
-def connect_to_cloud_blockstorage(region=None):
+def connect_to_cloud_blockstorage(identity, region=None):
     """Creates a client for working with cloud blockstorage."""
-    return _create_client(ep_name="volume", service_type="volume",
+    return _create_client(identity, ep_name="volume", service_type="volume",
             region=region)
 
 
-def connect_to_cloud_dns(region=None):
+def connect_to_cloud_dns(identity, region=None):
     """Creates a client for working with cloud dns."""
-    return _create_client(ep_name="dns", service_type="rax:dns", region=region)
+    return _create_client(identity, ep_name="dns", service_type="rax:dns",
+            region=region)
 
 
-def connect_to_cloud_networks(region=None):
+def connect_to_cloud_networks(identity, region=None):
     """Creates a client for working with cloud networks."""
-    return _create_client(ep_name="compute:network", service_type="compute",
-            region=region)
+    return _create_client(identity, ep_name="compute:network",
+            service_type="compute", region=region)
 
 
-def connect_to_cloud_monitoring(region=None):
+def connect_to_cloud_monitoring(identity, region=None):
     """Creates a client for working with cloud monitoring."""
-    return _create_client(ep_name="monitor", service_type="monitor",
+    return _create_client(identity, ep_name="monitor", service_type="monitor",
             region=region)
 
 
-def connect_to_autoscale(region=None):
+def connect_to_autoscale(identity, region=None):
     """Creates a client for working with AutoScale."""
-    return _create_client(ep_name="autoscale",
+    return _create_client(identity, ep_name="autoscale",
             service_type="autoscale", region=region)
 
 
@@ -727,7 +718,6 @@ def get_http_debug():
     return _http_debug
 
 
-@_assure_identity
 def set_http_debug(val):
     global _http_debug
     _http_debug = val

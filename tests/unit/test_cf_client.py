@@ -33,6 +33,7 @@ class CF_ClientTest(unittest.TestCase):
         self.orig_connect_to_cloud_loadbalancers = ctclb
         ctcbs = pyrax.connect_to_cloud_blockstorage
         self.orig_connect_to_cloud_blockstorage = ctcbs
+        self.identity = FakeIdentity()
         super(CF_ClientTest, self).__init__(*args, **kwargs)
 
     def setUp(self):
@@ -40,10 +41,9 @@ class CF_ClientTest(unittest.TestCase):
         pyrax.connect_to_cloud_loadbalancers = Mock()
         pyrax.connect_to_cloud_databases = Mock()
         pyrax.connect_to_cloud_blockstorage = Mock()
-        pyrax.identity = FakeIdentity()
+        pyrax._create_identity = Mock(return_value=self.identity)
         pyrax.set_credentials("fakeuser", "fakeapikey", region="FAKE")
-        pyrax.connect_to_cloudfiles(region="FAKE")
-        self.client = pyrax.cloudfiles
+        self.client = pyrax.connect_to_cloudfiles(self.identity, region="FAKE")
         self.client._container_cache = {}
         self.cont_name = utils.random_name(ascii_only=True)
         self.obj_name = utils.random_name(ascii_only=True)

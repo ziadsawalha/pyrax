@@ -6,7 +6,6 @@ import unittest
 
 import pyrax
 
-
 # This file needs to contain the actual credentials for a
 # valid Rackspace Cloud account.
 creds_file = os.path.expanduser("~/.rackspace_cloud_credentials")
@@ -17,7 +16,7 @@ class TestCase(unittest.TestCase):
         pyrax.set_credential_file(creds_file)
 
     def tearDown(self):
-        pyrax.clear_credentials()
+        pass
 
     def test_cloudservers_images(self):
         imgs = pyrax.cloudservers.images.list()
