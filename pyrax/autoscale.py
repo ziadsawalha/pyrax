@@ -414,7 +414,7 @@ class ScalingGroupManager(BaseManager):
                     "server": {
                         "name": server_name or srv_args.get("name"),
                         "imageRef": image or srv_args.get("imageRef"),
-                        "flavorRef": flavor or srv_args.get("flavorRef"),
+                        "flavorRef": "%s" % flavor or srv_args.get("flavorRef"),
                         "OS-DCF:diskConfig": disk_config or
                                 srv_args.get("OS-DCF:diskConfig"),
                         "personality": personality or
@@ -559,7 +559,7 @@ class ScalingGroupManager(BaseManager):
         body = [body]
         resp, resp_body = self.api.method_post(uri, body=body)
         data = resp_body.get("webhooks")[0]
-        return AutoScaleWebhook(self, data, policy)
+        return AutoScaleWebhook(self, data, policy, scaling_group)
 
 
     def list_webhooks(self, scaling_group, policy):
@@ -569,7 +569,7 @@ class ScalingGroupManager(BaseManager):
         uri = "/%s/%s/policies/%s/webhooks" % (self.uri_base,
                 utils.get_id(scaling_group), utils.get_id(policy))
         resp, resp_body = self.api.method_get(uri)
-        return [AutoScaleWebhook(self, data, policy)
+        return [AutoScaleWebhook(self, data, policy, scaling_group)
                 for data in resp_body.get("webhooks", [])]
 
 
@@ -582,7 +582,7 @@ class ScalingGroupManager(BaseManager):
                 utils.get_id(webhook))
         resp, resp_body = self.api.method_get(uri)
         data = resp_body.get("webhook")
-        return AutoScaleWebhook(self, data, policy)
+        return AutoScaleWebhook(self, data, policy, scaling_group)
 
 
     def update_webhook(self, scaling_group, policy, webhook, name=None,
@@ -686,7 +686,7 @@ class ScalingGroupManager(BaseManager):
         if scaling_policies is None:
             scaling_policies = []
         server_args = {
-            "flavorRef": flavor,
+            "flavorRef": "%s" % flavor,
             "name": server_name,
             "imageRef": utils.get_id(image),
         }
@@ -814,10 +814,10 @@ class AutoScalePolicy(BaseResource):
 
 
 class AutoScaleWebhook(BaseResource):
-    def __init__(self, manager, info, policy, *args, **kwargs):
+    def __init__(self, manager, info, policy, scaling_group, *args, **kwargs):
         super(AutoScaleWebhook, self).__init__(manager, info, *args, **kwargs)
         if not isinstance(policy, AutoScalePolicy):
-            policy = manager.get_policy(policy)
+            policy = manager.get_policy(scaling_group, policy)
         self.policy = policy
         self._non_display = ["links", "policy"]
 
