@@ -253,7 +253,7 @@ class PyraxInitTest(unittest.TestCase):
 
     def test_connect_to_services(self):
         pyrax.connect_to_services(identity=self.identity)
-        pyrax.connect_to_cloudservers.assert_called_once_with( self.identity,
+        pyrax.connect_to_cloudservers.assert_called_once_with(self.identity,
                 region=None)
         pyrax.connect_to_cloudfiles.assert_called_once_with(self.identity,
                 region=None)
