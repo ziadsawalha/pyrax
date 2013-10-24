@@ -69,6 +69,7 @@ try:
     from clouddns import CloudDNSClient
     from cloudnetworks import CloudNetworkClient
     from cloudmonitoring import CloudMonitorClient
+    from queueing import QueueClient
 except ImportError:
     # See if this is the result of the importing of version.py in setup.py
     callstack = inspect.stack()
@@ -90,6 +91,7 @@ cloud_dns = None
 cloud_networks = None
 cloud_monitoring = None
 autoscale = None
+queues = None
 # Default region for all services. Can be individually overridden if needed
 default_region = None
 # Encoding to use when working with non-ASCII names
@@ -117,6 +119,7 @@ _client_classes = {
         "compute:network": CloudNetworkClient,
         "monitor": CloudMonitorClient,
         "autoscale": AutoScaleClient,
+        "queues": QueueClient,
         }
 
 
@@ -714,6 +717,12 @@ def connect_to_autoscale(identity, region=None):
             service_type="autoscale", region=region)
 
 
+def connect_to_queues(region=None):
+    """Creates a client for working with Queues."""
+    return _create_client(ep_name="queues",
+            service_type="queues", region=region)
+
+
 def get_http_debug():
     return _http_debug
 
@@ -725,7 +734,7 @@ def set_http_debug(val):
     identity.http_log_debug = val
     for svc in (cloudservers, cloudfiles, cloud_loadbalancers,
             cloud_blockstorage, cloud_databases, cloud_dns, cloud_networks,
-            autoscale):
+            autoscale, queues):
         if svc is not None:
             svc.http_log_debug = val
     if not val:
