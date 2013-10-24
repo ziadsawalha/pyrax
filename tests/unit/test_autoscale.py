@@ -1241,7 +1241,7 @@ class AutoscaleTest(unittest.TestCase):
         mgr.resume.assert_called_once_with(sg)
 
     def test_clt_replace(self):
-        clt = fakes.FakeAutoScaleClient()
+        clt = fakes.FakeAutoScaleClient(self.identity)
         mgr = clt._manager
         sg = self.scaling_group
         name = utils.random_unicode()
@@ -1297,7 +1297,7 @@ class AutoscaleTest(unittest.TestCase):
         mgr.get_launch_config.assert_called_once_with(sg)
 
     def test_clt_replace_launch_config(self):
-        clt = fakes.FakeAutoScaleClient()
+        clt = fakes.FakeAutoScaleClient(self.identity)
         mgr = clt._manager
         sg = self.scaling_group
         mgr.replace_launch_config = Mock()
@@ -1391,7 +1391,7 @@ class AutoscaleTest(unittest.TestCase):
         mgr.get_policy.assert_called_once_with(sg, pol)
 
     def test_clt_replace_policy(self):
-        clt = fakes.FakeAutoScaleClient()
+        clt = fakes.FakeAutoScaleClient(self.identity)
         mgr = clt._manager
         sg = self.scaling_group
         pol = utils.random_unicode()
@@ -1481,7 +1481,7 @@ class AutoscaleTest(unittest.TestCase):
         mgr.get_webhook.assert_called_once_with(sg, pol, hook)
 
     def test_clt_replace_webhook(self):
-        clt = fakes.FakeAutoScaleClient()
+        clt = fakes.FakeAutoScaleClient(self.identity)
         mgr = clt._manager
         sg = self.scaling_group
         pol = utils.random_unicode()
